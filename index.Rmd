@@ -411,7 +411,8 @@ observeEvent(input$districtMapMLR_click, {
                 # ---- Predictors highchart ----
                 pred_hc <- 
                  highchart() %>%
-                      hc_plotOptions(column = list(stacking = 'normal')) %>%
+                      hc_plotOptions(column = list(stacking = 'normal'),
+                                     line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
                       hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
                       hc_yAxis_multiples(
                         list(title = list(
