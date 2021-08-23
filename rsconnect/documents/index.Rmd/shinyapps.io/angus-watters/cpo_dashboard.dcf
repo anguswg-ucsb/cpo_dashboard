@@ -1,0 +1,12 @@
+name: cpo_dashboard
+title: cpo_dashboard
+username:
+account: angus-watters
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4521321
+bundleId: 4951253
+url: https://angus-watters.shinyapps.io/cpo_dashboard/
+when: 1629665144.7176
+asMultiple: FALSE
+asStatic: FALSE

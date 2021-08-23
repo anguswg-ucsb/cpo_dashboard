@@ -84,8 +84,9 @@ district_data <- left_join(
     year                = as.factor(year)
 
   ) %>%
-  dplyr::select(1:8, 30)
+  dplyr::select(1:8, 28:31)
 
+# ----  LONG district demand, aug supply, supply data ----
 distr <- district_data %>%
   filter(district == 6)  %>%
   mutate(
@@ -96,15 +97,15 @@ distr <- district_data %>%
          ) %>%
   rename(
     "Supply Augmented" = aug_supply2,
-    "Demand" = demand2,
+    "Demand" = demand,
     "Supply Direct flow" = supply_dir) %>%
-  pivot_longer(cols = c("Demand", aug_supply, "Supply Direct flow"))
+  pivot_longer(cols = c("Demand", "Supply Augmented", "Supply Direct flow"))
 
-# % of demand values for bar chart
+# ---- % of demand values for bar chart -----
 distr_pct <- distr %>%
   mutate(value_pct = value/demand_val)
 
-
+# ---- WIDE district demand, aug supply, supply data ----
 distr_wide <- district_data %>%
   filter(district == 6)  %>%
   mutate(
@@ -113,16 +114,20 @@ distr_wide <- district_data %>%
     demand2     = demand - aug_supply2
   ) %>%
   rename(
-    "Supply Augmented" = aug_supply2,
+    "Supply Augmented2" = aug_supply2,
+    "Supply Augmented" = aug_supply,
     "Demand" = demand,
+    "Demand_diff" = demand2,
     "Supply Direct flow" = supply_dir)
 
-ws_plot(ws_district)
+ws_plot(ws_district, type = "bar")
+
+# ----  single shortage values for column plot ----
 tmp_short <- distr %>%
-  dplyr::select(year, short_dir) %>%
+  dplyr::select(year, short_dir, short) %>%
   unique()
 
-
+# ---- Dem/supply line graph + shortage bar graph ----
 ggplot()  +
   geom_col(data = tmp_short,
            aes(x = year, y = short_dir),
@@ -130,26 +135,24 @@ ggplot()  +
            ) +
   geom_line(data = distr,
             aes(x = year, y =value, color = name),
-             size = 1.25)
+             size = 1.25) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 32))
 
-
-
-scale_x_continuous(breaks = scales::pretty_breaks(n = 32))
-unique(distr$short_dir)
+# ---- Dem/supply area graph + shortage bar graph ----
 stk_gg <- ggplot() +
-  geom_col(data = distr,
-            aes(x = year, y =value, fill = name),
-           color = "black",
-           position = "stack"
-            # position = position_dodge2(width = 0)
-           # stat = "identity"
-  ) +
-  geom_area(data = distr,
-            aes(x = year, y =value, fill = name), col = "darkgrey", size = 0.1,
+  # geom_col(data = distr_pct,
+  #           aes(x = year, y =value_pct, fill = name),
+  #          color = "black",
+  #          position = "stack"
+  #           # position = position_dodge2(width = 0)
+  #          # stat = "identity"
+  # ) +
+  geom_area(data = ws_district,
+            aes(x = Year, y =value, fill = name), col = "darkgrey", size = 0.1,
             position = "stack"
             ) +
-  geom_line(data = distr,
-            aes(x = year, y = short_dir),
+  geom_line(data = ws_district,
+            aes(x = Year, y = short_dir),
             col = "black",
             size = 1.25
   ) +
@@ -172,7 +175,7 @@ stk_gg <- ggplot() +
 stk_gg
 plotly::ggplotly(stk_gg)
 
-
+# ---- HC Dem/sup line + shortage bar ----
 highchart() %>%
   # hc_plotOptions(series = list(stacking = 'normal')) %>%
   hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
@@ -216,11 +219,69 @@ highchart() %>%
   # hc_colors(c("darkred", "dodgerblue", "lightblue", "darkblue")) %>%
   # hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
 
+# ---- HC Dem/sup line + shortage bar ----
+highchart() %>%
+  # hc_plotOptions(series = list(stacking = 'normal')) %>%
+  hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
+  hc_yAxis_multiples(
+    list(min = 0, max = 100, opposite = TRUE),
+    list(min = 0, max = 80000)
+  ) %>%
+  hc_add_series(
+   data = distr_wide, name = "Shortage",
+   type = 'column', hcaes(x = year, y = short_dir_norm), yAxis = 0)  %>%
+   hc_add_series(
+     data = distr_wide, name = "Demand",
+     type = 'line', hcaes(x = year, y = Demand), yAxis = 1) %>%
+   hc_add_series(
+     data = distr_wide, name = "Augmented supply",
+     type = 'line', hcaes(x = year, y = `Supply Augmented2`), yAxis = 1) %>%
+   hc_add_series(
+     data = distr_wide, name = "Supply Direct Flow",
+     type = 'line',  hcaes(x = year, y = `Supply Direct flow`), yAxis = 1)  %>%  hc_xAxis(categories = distr$year) %>%
+  # hc_colors(c("darkred", "lightgreen", "#1aadce", "yellow")) %>%
+  hc_colors(c("darkred", "darkblue", "forestgreen", "dodgerblue")) %>%
+  hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
 
 
 
-
-
+# ---- HC Dem/sup bar + shortage line ----
+highchart() %>%
+    hc_plotOptions(column = list(stacking = 'normal')) %>%
+    hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
+    hc_yAxis_multiples(
+      list(title = list(text = "Shortage volume (M/Gal)"), min = 0, max = 50000, opposite = TRUE),
+      list(title = list(text = "Water volume (M/gal)"), min = 0, max = 80000)
+    ) %>%
+    # hc_add_series(
+    #   data = distr_wide, name = "Demand",
+    #   type = 'column', hcaes(x = year, y = Demand_diff),
+    #   yAxis = 1, fillOpacity = 0.3) %>%
+  hc_add_series(
+      data = distr_wide, name = "Shortage",
+      type = 'column', hcaes(x = year, y = short),
+      yAxis = 1, fillOpacity = 0.1) %>%
+  hc_add_series(
+      data = distr_wide, name = "Augmented supply",
+      type = 'column', hcaes(x = year, y = `Supply Augmented`),
+      yAxis = 1, fillOpacity = 0.3) %>%
+  hc_add_series(
+      data = distr_wide, name = "Direct Flow Supply",
+      type = 'column',  hcaes(x = year, y = `Supply Direct flow`),
+      yAxis = 1,  fillOpacity = 0.3) %>%
+  hc_add_series(
+      data = tmp_short, name = "Total shortage",
+      type = 'line', hcaes(x = year, y = short), yAxis = 0)  %>%
+  hc_add_series(
+      data = tmp_short, name = "Direct shortage",
+      type = 'line', hcaes(x = year, y = short_dir), yAxis = 0)  %>%
+  hc_add_series(
+      data = distr_wide, name = "Demand",
+      type = 'line', hcaes(x = year, y = Demand), yAxis = 1)  %>%
+    hc_xAxis(categories = distr$year) %>%
+    # hc_colors(c("darkred", "lightgreen", "#1aadce", "yellow")) %>%
+    hc_colors(c("#E18686",  "#70BCE2", "#2984B2", "darkblue", "pink", "darkred")) %>%
+    hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
 
 
 

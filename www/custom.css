@@ -1,0 +1,24 @@
+.bg-success {
+    background-color: rgba(248,188,25, 0.8);
+}
+.value-box .value {
+    font-size: 38px;
+    color: black;
+    font-weight: bold;
+    margin: 0 0 3px 0;
+    white-space: nowrap;
+    padding: 0;
+}
+
+h4, .h4 {
+    font-size: 18px;
+    color: black;
+}
+h5, .h5 {
+    font-size: 14px;
+    color: dimgrey;
+}
+
+.btn-default:hover {
+    color: red;
+}
