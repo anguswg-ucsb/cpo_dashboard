@@ -4,11 +4,17 @@ basemap <- function(shp, pts = NULL) {
     # pal2 <- colorNumeric("inferno", reverse = TRUE, domain = today$cases, n = 50)
 
     leaflet() %>%
-          addProviderTiles(providers$OpenStreetMap, group = "Topographic") %>%
+          addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
+          addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+          addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
+          addLayersControl(
+            options = layersControlOptions(collapsed = FALSE),
+            baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
+          ) %>%
           addPolygons(
               data = shp,
-              fillColor = 'grey',
-              fillOpacity = 0.3,
+              fillColor = 'white',
+              fillOpacity = 0.4,
               col = "black",
               weight = 2,
               label = ~DISTRICT,
@@ -29,40 +35,19 @@ basemap <- function(shp, pts = NULL) {
               activeColor = "red",
               completedColor = "green" ) %>%
             leafem::addMouseCoordinates()
-          # addLabelOnlyMarkers(
-          #      data = centers,
-          #      label = ~DISTRICT,
-          #      labelOptions = labelOptions(
-          #          noHide = TRUE,
-          #          direction = 'center',
-          #          textOnly = T,
-          #          style = list(
-          #                    "color" = "black",
-          #                    "font-weight" = "1000",
-          #                    "font-size" = "9px",
-          #                    "border" = "1.5px solid black",
-          #                    "background-color"="LightCyan",
-          #                    "border-color" = "rgba(0,0,0,0.9)"
-          #             )
-          #          )
-          #      ) %>%
-          # addLegend(
-          #   data = centroids,
-          #   "bottomright",
-          #   pal = pal,
-          #   values = ~af_total,
-          #   title = "Coefficient",
-          #   labFormat = labelFormat(digits = 10,),
-          #   opacity = 1
-          # )
-
 }
 mlr_map <- function(shp, pts = NULL) {
 
       pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
       # Leaflet map
       leaflet() %>%
-        addProviderTiles(providers$OpenStreetMap, group = "Topographic") %>%
+        addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
+        addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+        addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
+        addLayersControl(
+          options = layersControlOptions(collapsed = FALSE),
+          baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
+        ) %>%
         addPolygons(
           data = shp,
           color = "black",
@@ -84,7 +69,7 @@ mlr_map <- function(shp, pts = NULL) {
           "bottomright",
           pal = pal,
           values = ~variance_rsq,
-          title = "Variance x R2",
+          title = "Climate sensitivity",
           labFormat = labelFormat(digits = 10,),
           opacity = 1
         ) %>%
@@ -95,7 +80,8 @@ mlr_map <- function(shp, pts = NULL) {
           primaryAreaUnit = "sqmiles",
           activeColor = "red",
           completedColor = "green" ) %>%
-        leafem::addMouseCoordinates()
+        leafem::addMouseCoordinates() %>%
+        leaflet::setView(lng = -105.5, lat = 39.5, zoom = 7)
 }
 coeff_map <- function(shp, pts) {
     pal <- colorNumeric("viridis", domain = pts$af_total, n = 10)

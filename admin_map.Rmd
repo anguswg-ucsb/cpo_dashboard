@@ -1,0 +1,217 @@
+---
+title: "CPO"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    css: www/custom.css
+    navbar:
+      - { icon: "fa-question-circle", href: "https://github.com/anguswg-ucsb/drought_data_processing", align: right }
+    theme: cerulean
+    orientation: columns
+    source_code: embed
+    vertical_layout: fill
+---
+
+```{r setup, include = FALSE}
+# Shiny & Flexdashboard libraries
+library(shiny)
+library(flexdashboard)
+
+# Data libraries
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(leaflet)
+library(sf)
+library(tools)
+library(highcharter)
+
+source('data_utils.R')
+```
+
+
+```{r context="server"}
+# districts for analysis
+distr_num <- c(1,  2,  4,  5,  6,  7,  8,  9,  23, 64, 80,
+               36, 37, # 38, 
+               39, 45, 50, 51, 52, 53, 70, 72)
+
+# district shapefile path
+shp_path = "water_districts_simple.geojson"
+
+ # load shapefiles as spatial polygon object
+shp <- sf::read_sf(paste0(shp_path), quiet = TRUE) %>%
+  filter(DISTRICT %in% distr_num) %>%
+  st_transform(4326) %>% 
+  st_cast("MULTIPOLYGON")
+
+# Tidied MLR results by district
+tidy_mlr <- readRDS("tidy_mlr.rds")
+
+shp <- left_join(shp, tidy_mlr, by = c("DISTRICT" = "district"))
+
+node_pts <- readRDS("node_pts.rds")
+
+#Initialize Maps 
+output$districtMap     <- renderLeaflet({ mlr_map(shp = shp) })
+output$nodeMap         <- renderLeaflet({ basemap(shp = shp) })
+```
+
+Water ditches
+=======================================
+Column {data-width=450}
+-----------------------------------------------------------------------
+### Water districts
+```{r}
+leafletOutput("districtMap")
+```
+
+<!-- ### Node text -->
+<!-- ```{r} -->
+<!-- verbatimTextOutput("nodeText") -->
+<!-- ``` -->
+
+```{r context="server"}
+# render district value box at start
+output$districtBoxMLR <- renderValueBox(
+                    valueBox(
+                      value = "District", 
+                      color = "success"
+                  )
+                )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMap_click, {
+   if(!is.null(input$districtMap_click)) {
+      click <- input$districtMap_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+
+          # District number value box
+          output$districtBoxMLR <- renderValueBox(
+            valueBox(
+              value = paste0("District ", district_id$district),
+              color = "success"
+              )
+            )
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          # bb = shp %>%
+          #     st_bbox() %>%
+          #     st_as_sfc() %>%
+          #     st_transform(4326) %>%
+          #     st_as_sf()
+          # # Map 2 fly to bounds
+          # bounds <- st_bbox(bb) %>%
+          #     st_as_sfc() %>%
+          #     st_buffer(0.009) %>%
+          #     st_bbox() %>%
+          #     as.vector()
+       
+          leafletProxy("districtMap") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                    data = shp,
+                    color = "black",
+                    fillOpacity = 0.8,
+                    fillColor = ~pal(variance_rsq),
+                    weight = 2,
+                    label = ~DISTRICT,
+                    labelOptions = labelOptions(
+                      noHide = F,
+                      # direction = 'center',
+                      # textOnly = F)
+                      style = list(
+                        "color" = "black",
+                        "font-weight" = "1000")
+                  )
+                ) 
+          bb = shp %>%
+              # filter(DISTRICT == 6) %>% 
+              filter(DISTRICT == district_id$district) %>% 
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          
+          # Fly to bounds on Node map
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              # st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+          
+          node_marker <- node_pts %>%
+            # filter(district == 6)
+            filter(district == district_id$district)
+          
+          leafletProxy("nodeMap") %>%
+                clearMarkers() %>%
+                clearShapes() %>%
+                addPolygons(
+                      data = filter(shp, DISTRICT == district_id$district),
+                      fillColor = 'white',
+                      fillOpacity = 0.4,
+                      col = "black",
+                      weight = 2,
+                      label = ~DISTRICT,
+                      labelOptions = labelOptions(
+                          noHide = F,
+                          # direction = 'center',
+                          # textOnly = F)
+                          style = list(
+                            "color" = "black",
+                            "font-weight" = "1000")
+                    )
+                  ) %>% 
+                 addCircleMarkers(
+                      data = node_marker,
+                      radius = 6,
+                      color = "black",
+                      fillColor ="red",
+                      fillOpacity = 0.7,
+                      weight = 3,
+                      stroke = TRUE) %>% 
+            flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+          # output$nodeText <- renderText({
+          #   paste0(node_marker)
+          # })
+ 
+       }
+      }
+  })
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+### Nodes
+```{r}
+leafletOutput("nodeMap")
+```
+
+
+
+
+
+
+
+

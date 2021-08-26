@@ -13,35 +13,38 @@ output:
 ---
 
 ```{r setup, include = FALSE}
+# Shiny & Flexdashboard libraries
 library(shiny)
 library(flexdashboard)
-# libraries
 
+# Data libraries
 library(tidyr)
 library(dplyr)
 library(purrr)
 library(ggplot2)
-# library(ggcorrplot)
-# library(gghighlight)
 library(kableExtra)
 library(broom)
 library(leaflet)
 library(sf)
+library(tools)
+library(highcharter)
+library(olsrr)
+library(formattable)
+
+# library(ggcorrplot)
+# library(gghighlight)
 # library(huxtable)
 # library(gtsummary) 
 # library(patchwork)
 # library(snakecase)
-library(tools)
 # library(tidymodels) # modeling
 # library(jtools) # Linear regression exploration
 # library(vip) # Variable importance  
 # library(PerformanceAnalytics)
 # library(mgcv)
 # library(sjPlot)
-library(plotly)
-library(highcharter)
+# library(plotly)
 # library(car)
-library(olsrr)
 # library(tsibble)
 # library(feasts)
 
@@ -57,6 +60,98 @@ source('data_utils.R')
 distr_num <- c(1,  2,  4,  5,  6,  7,  8,  9,  23, 64, 80,
                36, 37, # 38, 
                39, 45, 50, 51, 52, 53, 70, 72)
+
+# dependent variable choices
+# outcome_lst <- data.frame(outcome_variable = 
+#                             c("short_total", "short_norm", 
+#                               "short_dir_total", "short_dir_norm",
+#                               "af_total")
+#                           )
+# # dependent variable choices
+# outcome_lst_admin <- data.frame(outcome_variable = 
+#                                   c("short", "short_norm", 
+#                                     "short_dir", "short_dir_norm", "demand", "supply", "supply_dir",
+#                                     "aug_supply", "aug_supply_norm", "af_total")
+#                                 )
+# 
+# # outcomes for log trans selection inputs
+# outcome_lst_log <- data.frame(outcome_variable = 
+#                             c("short_log",  "short_dir_log")
+#                           )
+# 
+# outcome_lst_log2 <- data.frame(outcome_variable = 
+#                             c("short_log",  "short_dir_log", "short_norm_log", "short_dir_norm_log")
+ 
+                         # )
+indicator_lst <- list(
+  "Precipitation"                 = "prcp",
+  "SWE maximum"                   = "swe_max",
+  "Average temperature"           = "tavg",
+  "Actual Evapotranspiration"     = "aet",
+  "Potential Evapotranspiration"  = "pet",
+  "Soil moisture"                 = "soilm",
+  "PDSI"                          = "pdsi",
+  "PDSI (gridMET)"                = "pdsi_gridmet",
+  "EDDI 1 month"                  = "eddi1",
+  "EDDI 3 month"                  = "eddi3",
+  "EDDI 6 month"                  = "eddi6", 
+  "EDDI 12 month"                 = "eddi12",
+  "SPI 1 month"                   = "spi1",
+  "SPI 3 month"                   = "spi3",
+  "SPI 6 month"                   = "spi6",
+  "SPI 9 month"                   = "spi9",
+  "SPI 12 month"                  = "spi12"
+  )
+
+impacts_lst <- list(
+  "Total shortage"              = "short",
+  "Normalized total shortage"   = "short_norm",
+  "Direct shortage"             = "short_dir",
+  "Normalized direct shortage"  = "short_dir_norm",
+  "Natural flows"               = "af_total"
+)
+# indepent_lst <- data.frame(independent_variable =   
+#                              c("prcp", "prcp_pct_norm", "aet", "pet", "soilm",
+#                               "pdsi","pdsi_gridmet", "eddi1","eddi3", "eddi6", "eddi12",
+#                               "spi1", "spi3", "spi6", "spi9", "spi12","tavg", "swe_max")
+#                            )
+#                  
+# 
+#          
+# indepent_lst2 <- data.frame(independent_variable =   
+#                                c("Precipitation",
+#                                  "SWE maximum", 
+#                                  "Average temperature",
+#                                  "Actual Evapotranspiration",
+#                                  "Potential Evapotranspiration", 
+#                                  "Soil moisture",
+#                                  "PDSI",
+#                                  "PDSI (gridMET)",
+#                                  "EDDI 1 month",
+#                                  "EDDI 3 month",
+#                                  "EDDI 6 month", 
+#                                  "EDDI 12 month",
+#                                   "SPI 1 month",
+#                                  "SPI 3 month",
+#                                  "SPI 6 month",
+#                                  "SPI 9 month",
+                           #       "SPI 12 month")
+                           # )
+# # dependent variable choices
+# outcome_lst <- data.frame(outcome_variable = 
+#                             c("short_total", "short_norm",
+#                               "short_dir_total", "short_dir_norm",
+#                               "af_total")
+#                           )
+# # dependent variable choices
+# outcome_lst2 <- data.frame(outcome_variable = 
+#                             c("Total shortage",
+#                               "Normalized total shortage",
+#                               "Direct shortage",
+#                               "Normalized direct shortage",
+#                               "Natural flows")
+#                           )
+                         
  
 
 # short_year <- readRDS("model_data_year_v2")
@@ -103,12 +198,13 @@ label <- list(
   )
 # Initialize Maps 
 output$districtMapMLR     <- renderLeaflet({ mlr_map(shp = shp) })
-# output$districtMapLM     <- renderLeaflet({ basemap(shp = shp) })
+output$districtMapLM     <- renderLeaflet({ mlr_map(shp = shp) })
 ```
-Multiple linear regression
+
+Multiple linear regression 
 =====================================
 Inputs {.sidebar}
--------------------------------------
+----------------------------------------------------
 ### **TITLE**
 
 <br> 
@@ -120,337 +216,6 @@ Inputs {.sidebar}
 ##### **SUMMARY INFO**
 
 This area can be used for additional text/meta data if we'd like. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-
-Column {data-width=500}
--------------------------------------
-### Timeseries
-```{r}
-# plotly::plotlyOutput("wsTimeseries")
-highcharter::highchartOutput("wsTimeseries")
-```
-
-```{r context = "server"}
-observeEvent(input$districtMapMLR_click, {
-   if(!is.null(input$districtMapMLR_click)) {
-      click <- input$districtMapMLR_click %>%
-            data.frame() %>%
-            dplyr::select(lat,lng)
-    
-          pt <- sf::st_as_sf(
-            click,
-            coords = c("lng", "lat"),
-            crs = 4326
-            )
-          # point intersection w/ polygons
-          pt_intersect <-  st_filter(shp, pt)
-    
-          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
-          if(nrow(pt_intersect) == 0) {
-              NULL
-             } else {
-           # } else if(outcome5() == "short_log") {
-                district_id <- pt_intersect %>%
-                    rename(district = DISTRICT) %>%
-                    mutate(district = as.numeric(district))
-                
-                
-                # ---- Water supply data summarized to the year ----
-                ws_data <- by_admin %>%
-                    group_by(year, district) %>%
-                    mutate(
-                        year          = as.factor(year),
-                        admin_number  = as.integer(round(admin, 0))
-                    ) %>%
-                    dplyr::filter(!year %in% c(1980, 2013)) %>%
-                    group_by(basin, district, year) %>%
-                    summarise(
-                        short               = sum(short, na.rm = T),
-                        short_dir           = sum(short_dir, na.rm = T),
-                        demand              = sum(demand, na.rm = T),
-                        supply              = sum(supply, na.rm = T),
-                        supply_dir          = sum(supply_dir, na.rm = T)
-                      ) %>%
-                    mutate(
-                        short_norm          = 100*(round(short/demand, 3)),
-                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
-                        aug_supply          = round((supply - supply_dir), 3),
-                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
-                        year                = as.factor(year)
-                    ) 
-                # ---- Water supply data filter to district ----
-                # ws_district <- ws_data %>% 
-                #     # filter(district == 6)  %>% 
-                #     filter(district == district_id$district)  %>% 
-                #     mutate(
-                #         year          = as.numeric(as.character(year)),
-                #         aug_supply2   = aug_supply + supply_dir,
-                #         demand2       = demand - aug_supply2
-                #     ) %>% 
-                #     rename(
-                #         "Supply Augmented"    = aug_supply,
-                #         "Demand"              = demand2,
-                #         "Supply Direct flow"  = supply_dir,
-                #         "Year"                = year
-                #         ) %>% 
-                #     pivot_longer(cols = c("Demand", "Supply Augmented", "Supply Direct flow"))
-                # ---- Plot Water Supply/demand/shortage ----
-                # stk_plot <- ws_plot(ws_district)
-                # 
-                # stk_plotly <- plotly::ggplotly(stk_plot, tooltip = c("x")) %>% 
-                #                   style(hoverlabel = label) %>% 
-                #                   layout(font = font,
-                #                          yaxis = list(fixedrange = TRUE),
-                #                          xaxis = list(fixedrange = TRUE)) %>% 
-                #                   config(displayModeBar = F)
-                
-                       #  ---- render plotly plot ----
-                # output$wsTimeseries <- renderPlotly({
-                #       stk_plotly
-                # })
-                # ---- WIDE district demand, aug supply, supply data ----
-                ws_wide <- ws_data %>%
-                    # filter(district == 7)  %>%
-                    filter(district == district_id$district)  %>%
-                    mutate(
-                      year        = as.numeric(as.character(year)),
-                      aug_supply2 = aug_supply + supply_dir,
-                      demand2     = demand - aug_supply2
-                    ) %>%
-                    rename(
-                      "Supply Augmented2" = aug_supply2,
-                      "Supply Augmented" = aug_supply,
-                      "Demand" = demand,
-                      "Demand_diff" = demand2,
-                      "Supply Direct flow" = supply_dir)
-                # ---- HC Dem/sup bar + shortage line ----
-                stk_hc <- 
-                  highchart() %>%
-                      hc_plotOptions(column = list(stacking = 'normal'),
-                                     line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
-                      hc_yAxis(title = list(text = "Water volume (M/gal)"), min = 0) %>%
-                      # hc_yAxis_multiples(
-                      #   list(title = list(text = "Shortage volume (M/Gal)"), min = 0, max = max(ws_wide$short_dir), opposite = TRUE),
-                      #   list(title = list(text = "Water volume (M/gal)"), min = 0, max = max(ws_wide$Demand)) ) %>%
-                      # hc_add_series( data = ws_wide, name = "Demand", type = 'column', hcaes(x = year, y = Demand_diff), yAxis = 1,
-                      # fillOpacity = 0.3) %>%
-                    hc_add_series(
-                        data = ws_wide, name = "Total shortage",
-                        type = 'column', hcaes(x = year, y = short),
-                        # yAxis = 1, 
-                        fillOpacity = 0.3) %>%
-                        hc_add_series(
-                        data = ws_wide, name = "Direct shortage",
-                        type = 'column', hcaes(x = year, y = short_dir),
-                        # yAxis = 1, 
-                        fillOpacity = 0.3) %>%
-                    hc_add_series(
-                        data = ws_wide, name = "Augmented supply",
-                        type = 'column', hcaes(x = year, y = `Supply Augmented`), 
-                        # yAxis = 1, 
-                        fillOpacity = 0.3) %>%
-                    hc_add_series(
-                        data = ws_wide, name = "Direct Flow Supply",
-                        type = 'column',  hcaes(x = year, y = `Supply Direct flow`), 
-                        # yAxis = 1, 
-                        fillOpacity = 0.3) %>%
-                    # hc_add_series(data = ws_wide, name = "Total shortage",type = 'line', hcaes(x = year, y = short), yAxis = 0)  %>%
-                    # hc_add_series(data = ws_wide, name = "Direct shortage",type = 'line', hcaes(x = year, y = short_dir), yAxis = 0)  %>%
-                    hc_add_series(
-                        data = ws_wide, name = "Demand",
-                        type = 'line', hcaes(x = year, y = Demand)
-                        # yAxis = 1
-                        )  %>%
-                      hc_xAxis(categories = ws_wide$year) %>%
-                      hc_colors(c("#a50000", "#E18686",  "#70BCE2", "#2984B2", "black")) %>%
-                      hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
-                stk_hc
-                #  ---- render plotly plot ----
-                output$wsTimeseries <- renderHighchart({
-                      stk_hc
-                })
-             }
-          }
-  })
-```
-
-### Predictors
-```{r}
-highcharter::highchartOutput("predictorTimeseries")
-```
-
-```{r context = "server"}
-observeEvent(input$districtMapMLR_click, {
-   if(!is.null(input$districtMapMLR_click)) {
-      click <- input$districtMapMLR_click %>%
-            data.frame() %>%
-            dplyr::select(lat,lng)
-    
-          pt <- sf::st_as_sf(
-            click,
-            coords = c("lng", "lat"),
-            crs = 4326
-            )
-          # point intersection w/ polygons
-          pt_intersect <-  st_filter(shp, pt)
-    
-          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
-          if(nrow(pt_intersect) == 0) {
-              NULL
-             } else {
-           # } else if(outcome5() == "short_log") {
-                district_id <- pt_intersect %>%
-                    rename(district = DISTRICT) %>%
-                    mutate(district = as.numeric(district))
-                
-                # ---- Summarize data for MLR ----
-                mlr_data <- by_admin %>%
-                  group_by(year, district) %>%
-                  mutate(
-                    year          = as.factor(year),
-                    admin_number  = as.integer(round(admin, 0))
-                  ) %>%
-                  dplyr::filter(!year %in% c(1980, 2013)) %>%
-                  group_by(basin, district, year) %>%
-                  summarise(
-                      short               = sum(short, na.rm = T),
-                      short_dir           = sum(short_dir, na.rm = T),
-                      demand              = sum(demand, na.rm = T),
-                      supply              = sum(supply, na.rm = T),
-                      supply_dir          = sum(supply_dir, na.rm = T)
-                  ) %>%
-                  mutate(
-                      short_norm          = 100*(round(short/demand, 3)),
-                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
-                      aug_supply          = round((supply - supply_dir), 3),
-                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
-                      year                = as.factor(year)
-                  )
-                
-                ## ------ Join model data w/ admin level supply/demand/short -------
-                mlr_district <- left_join(
-                      mlr_data,
-                      dplyr::select(short_year, year = wyear, district, 20:41),
-                      by = c("district", "year")
-                ) %>%
-                  # filter(district == 8) %>%
-                  filter(district == district_id$district) %>%
-                  dplyr::filter(!year %in% c(1980, 2013)) %>%
-                  # group_by(basin, district, water_right, year) %>%
-                  group_by(basin, district, year) %>%
-                  summarise(
-                      short               = sum(short, na.rm = T),
-                      short_dir           = sum(short_dir, na.rm = T),
-                      demand              = sum(demand, na.rm = T),
-                      supply              = sum(supply, na.rm = T),
-                      supply_dir          = sum(supply_dir, na.rm = T),
-                      af_total            = mean(af_total, na.rm = T),
-                      swe_max             = mean(swe_max, na.rm = T),
-                      prcp                = mean(prcp, na.rm = T),
-                      prcp_norm           = mean(prcp_norm, na.rm = T),
-                      pdsi                = mean(pdsi, na.rm = T),
-                      pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
-                      eddi1               = mean(eddi1, na.rm = T),
-                      eddi3               = mean(eddi3, na.rm = T),
-                      eddi6               = mean(eddi6, na.rm = T),
-                      eddi12              = mean(eddi12, na.rm = T),
-                      spi1                = mean(spi1, na.rm = T),
-                      spi3                = mean(spi3, na.rm = T),
-                      spi6                = mean(spi6, na.rm = T),
-                      spi9                = mean(spi9, na.rm = T),
-                      spi12               = mean(spi12, na.rm = T),
-                      tavg                = mean(tavg, na.rm = T),
-                      aet                 = mean(aet, na.rm = T),
-                      pet                 = mean(pet, na.rm = T),
-                      soilm               = mean(soilm, na.rm = T)
-                  ) %>%
-                  mutate(
-                      short_norm          = 100*(round(short/demand, 3)),
-                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
-                      aug_supply          = round((supply - supply_dir), 3),
-                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
-                      year                = as.factor(year)
-                  ) %>%
-                  ungroup()
-                
-                # ---- Prep data for model ----
-                mod_df <- mlr_district %>%
-                  dplyr::select(short_dir_norm, 10:11, 13:27)
-                
-                # ---- MLR Model + stepwise regression ----
-                lm_vfit <- lm(short_dir_norm~., data = mod_df) %>%
-                              # rm_collinearity(vif_thresh = 3.5) %>%
-                              ols_step_forward_p()
-                
-                # ---- Select predictors from data ----
-                ws_predictors <- mlr_district %>%
-                    ungroup() %>%
-                    dplyr::select(year, lm_vfit$predictors[1:2]) 
-                
-                # Fix names for axis, labels, titles
-                pred_names <- names(rename_all(ws_predictors, recode,
-                                        swe_max           = "SWE maximum",
-                                        prcp              = "Precipitation",
-                                        pdsi              = "PDSI",
-                                        pdsi_gridmet      = "PDSI (gridMET)",
-                                        eddi1             = "EDDI 1 month",
-                                        eddi3             = "EDDI 3 month",
-                                        eddi6             = "EDDI 6 month",
-                                        eddi12            = "EDDI 12 month",
-                                        spi1              = "SPI 1 month",
-                                        spi3              = "SPI 3 month",
-                                        spi6              = "SPI 6 month",
-                                        spi9              = "SPI 9 month",
-                                        spi12             = "SPI 12 month",
-                                        tavg              = "Average temperature (C)",
-                                        aet               = "Actual evapotranspiration",
-                                        pet               = "Potential Evapotranspiration",
-                                        soilm             = "Soil moisture")
-                                    )
-                
-                # ---- Predictors highchart ----
-                pred_hc <- 
-                 highchart() %>%
-                      hc_plotOptions(column = list(stacking = 'normal'),
-                                     line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
-                      hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
-                      hc_yAxis_multiples(
-                        list(title = list(
-                                text = pred_names[2]),
-                                top = "0%",
-                                height = "50%"
-                             ),
-                        list(title = list(
-                                text = pred_names[3]),
-                                top = "50%", 
-                                height = "50%",
-                                opposite = TRUE)
-                      ) %>%
-                      hc_add_series(
-                            data = ws_predictors, 
-                            name = pred_names[2],
-                            type = 'line',
-                            hcaes(x = year,  y = !!lm_vfit$predictors[1]),
-                            yAxis = 0,
-                            fillOpacity = 0.1) %>%
-                      hc_add_series(
-                            data = ws_predictors,
-                            name = pred_names[3],
-                            type = 'line', hcaes(x = year, y = !!lm_vfit$predictors[2]),
-                            yAxis = 1, fillOpacity = 0.1) %>%
-                      hc_xAxis(categories = ws_predictors$year) %>%
-                      hc_colors(c("darkblue",  "darkred")) %>%
-                      hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
-                
-                #  ---- render predictors HC plot ----
-                output$predictorTimeseries <- renderHighchart({
-                      pred_hc
-                })
-             }
-          }
-  })
-```
-
 
 Column {data-width=250}
 -----------------------------------------------------------------------
@@ -538,7 +303,7 @@ observeEvent(input$districtMapMLR_click, {
                         "color" = "black",
                         "font-weight" = "1000")
                   )
-                ) %>%
+                ) 
               # addLegend(
               #       data = shp,
               #       "bottomright",
@@ -564,7 +329,7 @@ observeEvent(input$districtMapMLR_click, {
               #                 "font-weight" = "1000")
               #               )
               #           ) %>% 
-              flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+              # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
               # addLabelOnlyMarkers(
               #           data = centroids,
               #           label = ~DISTRICT,
@@ -625,14 +390,15 @@ splitRightsMLR <- eventReactive(input$districtMapMLR_click, {
             
             # paste0(adminNum(), ": ", adm_date$date)
             breaks2 <- breaks %>% 
-                    # filter(district == 6) %>%
+                    # filter(district == 7) %>%
                     filter(district == district_id$district) %>%
                     ungroup() %>% 
-                    dplyr::select(split) %>% 
+                    filter(demand_cuml_tot == split) %>% 
+                    dplyr::select(admin_number) %>% 
                     head(1)
             adm_date <- admin_dates %>%
                  filter(admin_number == breaks2[[1]])
-            paste0(breaks2$split, ": ", adm_date$date)
+            paste0(breaks2$admin_number, ": ", adm_date$date)
 
          }
 })
@@ -642,8 +408,8 @@ splitRightsMLR <- eventReactive(input$districtMapMLR_click, {
 output$splitBoxMLR <- renderValueBox(
         valueBox(
           value   = paste0(splitRightsMLR()),
-          caption = "Admin number: date",
-          color   = "info"
+          caption = "Priority date",
+          color   = "success"
           )
         )
 
@@ -712,7 +478,7 @@ observeEvent(input$districtMapMLR_click, {
                           "color" = "black",
                           "font-weight" = "1000")
                     )
-                  ) %>%
+                  ) 
                 # addLegend(
                 #         data = shp,
                 #         "bottomright",
@@ -738,13 +504,13 @@ observeEvent(input$districtMapMLR_click, {
               #                 "font-weight" = "1000")
               #               )
               #           ) %>% 
-                flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+                # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
        }
     }
 })
 ```
 
-### **Senior/Junior priority date**
+### **Priority date**
 ```{r}
 valueBoxOutput("splitBoxMLR")
 ```
@@ -963,4 +729,1206 @@ observeEvent(input$districtMapMLR_click, {
   #         }
   # })
 ```
+
+
+Column {data-width=550}
+-------------------------------------
+### Timeseries
+```{r}
+# plotly::plotlyOutput("wsTimeseries")
+highcharter::highchartOutput("wsTimeseries")
+```
+
+```{r context = "server"}
+observeEvent(input$districtMapMLR_click, {
+   if(!is.null(input$districtMapMLR_click)) {
+      click <- input$districtMapMLR_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+    
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+    
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+           # } else if(outcome5() == "short_log") {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                
+                
+                # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                    group_by(year, district) %>%
+                    mutate(
+                        year          = as.factor(year),
+                        admin_number  = as.integer(round(admin, 0))
+                    ) %>%
+                    dplyr::filter(!year %in% c(1980, 2013)) %>%
+                    group_by(basin, district, year) %>%
+                    summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T)
+                      ) %>%
+                    mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year)
+                    ) 
+                # ---- Water supply data filter to district ----
+                # ws_district <- ws_data %>% 
+                #     # filter(district == 6)  %>% 
+                #     filter(district == district_id$district)  %>% 
+                #     mutate(
+                #         year          = as.numeric(as.character(year)),
+                #         aug_supply2   = aug_supply + supply_dir,
+                #         demand2       = demand - aug_supply2
+                #     ) %>% 
+                #     rename(
+                #         "Supply Augmented"    = aug_supply,
+                #         "Demand"              = demand2,
+                #         "Supply Direct flow"  = supply_dir,
+                #         "Year"                = year
+                #         ) %>% 
+                #     pivot_longer(cols = c("Demand", "Supply Augmented", "Supply Direct flow"))
+                # ---- Plot Water Supply/demand/shortage ----
+                # stk_plot <- ws_plot(ws_district)
+                # 
+                # stk_plotly <- plotly::ggplotly(stk_plot, tooltip = c("x")) %>% 
+                #                   style(hoverlabel = label) %>% 
+                #                   layout(font = font,
+                #                          yaxis = list(fixedrange = TRUE),
+                #                          xaxis = list(fixedrange = TRUE)) %>% 
+                #                   config(displayModeBar = F)
+                
+                       #  ---- render plotly plot ----
+                # output$wsTimeseries <- renderPlotly({
+                #       stk_plotly
+                # })
+                # ---- WIDE district demand, aug supply, supply data ----
+                ws_wide <- ws_data %>%
+                    # filter(district == 7)  %>%
+                    filter(district == district_id$district)  %>%
+                    mutate(
+                      year        = as.numeric(as.character(year)),
+                      aug_supply2 = aug_supply + supply_dir,
+                      demand2     = demand - aug_supply2
+                    ) %>%
+                    rename(
+                      "Supply Augmented2" = aug_supply2,
+                      "Supply Augmented" = aug_supply,
+                      "Demand" = demand,
+                      "Demand_diff" = demand2,
+                      "Supply Direct flow" = supply_dir) %>% 
+                  mutate(across(where(is.numeric), round, 0))
+                # ---- HC Dem/sup bar + shortage line ----
+                stk_hc <- 
+                  highchart() %>%
+                      hc_plotOptions(column = list(stacking = 'normal'),
+                                     line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
+                      hc_yAxis(title = list(text = "Water volume (M/gal)"), min = 0) %>%
+                      # hc_yAxis_multiples(
+                      #   list(title = list(text = "Shortage volume (M/Gal)"), min = 0, max = max(ws_wide$short_dir), opposite = TRUE),
+                      #   list(title = list(text = "Water volume (M/gal)"), min = 0, max = max(ws_wide$Demand)) ) %>%
+                      # hc_add_series( data = ws_wide, name = "Demand", type = 'column', hcaes(x = year, y = Demand_diff), yAxis = 1,
+                      # fillOpacity = 0.3) %>%
+                    hc_add_series(
+                        data = ws_wide, name = "Total shortage",
+                        type = 'column', hcaes(x = year, y = short),
+                        # yAxis = 1, 
+                        fillOpacity = 0.3) %>%
+                    # hc_add_series(
+                    #     data = ws_wide, name = "Direct shortage",
+                    #     type = 'column', hcaes(x = year, y = short_dir),
+                    #     # yAxis = 1, 
+                    #     fillOpacity = 0.3) %>%
+                    hc_add_series(
+                        data = ws_wide, name = "Augmented supply",
+                        type = 'column', hcaes(x = year, y = `Supply Augmented`), 
+                        # yAxis = 1, 
+                        fillOpacity = 0.3) %>%
+                    hc_add_series(
+                        data = ws_wide, name = "Direct Flow Supply",
+                        type = 'column',  hcaes(x = year, y = `Supply Direct flow`), 
+                        # yAxis = 1, 
+                        fillOpacity = 0.3) %>%
+                    # hc_add_series(data = ws_wide, name = "Total shortage",type = 'line', hcaes(x = year, y = short), yAxis = 0)  %>%
+                    # hc_add_series(data = ws_wide, name = "Direct shortage",type = 'line', hcaes(x = year, y = short_dir), yAxis = 0)  %>%
+                    hc_add_series(
+                        data = ws_wide, name = "Demand",
+                        type = 'line', hcaes(x = year, y = Demand)
+                        # yAxis = 1
+                        )  %>%
+                      hc_xAxis(categories = ws_wide$year) %>%
+                      hc_colors(c("#E18686",  "#70BCE2", "#2984B2", "black")) %>%
+                      hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                stk_hc
+                #  ---- render plotly plot ----
+                output$wsTimeseries <- renderHighchart({
+                      stk_hc
+                })
+             }
+          }
+  })
+```
+
+### Predictors
+```{r}
+highcharter::highchartOutput("predictorTimeseries")
+```
+
+```{r context = "server"}
+observeEvent(input$districtMapMLR_click, {
+   if(!is.null(input$districtMapMLR_click)) {
+      click <- input$districtMapMLR_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+    
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+    
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+           # } else if(outcome5() == "short_log") {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                
+                # ---- Summarize data for MLR ----
+                mlr_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                    year          = as.factor(year),
+                    admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+                
+                ## ------ Join model data w/ admin level supply/demand/short -------
+                mlr_district <- left_join(
+                      mlr_data,
+                      dplyr::select(short_year, year = wyear, district, 20:41),
+                      by = c("district", "year")
+                ) %>%
+                  # filter(district == 8) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  # group_by(basin, district, water_right, year) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T),
+                      af_total            = mean(af_total, na.rm = T),
+                      swe_max             = mean(swe_max, na.rm = T),
+                      prcp                = mean(prcp, na.rm = T),
+                      prcp_norm           = mean(prcp_norm, na.rm = T),
+                      pdsi                = mean(pdsi, na.rm = T),
+                      pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                      eddi1               = mean(eddi1, na.rm = T),
+                      eddi3               = mean(eddi3, na.rm = T),
+                      eddi6               = mean(eddi6, na.rm = T),
+                      eddi12              = mean(eddi12, na.rm = T),
+                      spi1                = mean(spi1, na.rm = T),
+                      spi3                = mean(spi3, na.rm = T),
+                      spi6                = mean(spi6, na.rm = T),
+                      spi9                = mean(spi9, na.rm = T),
+                      spi12               = mean(spi12, na.rm = T),
+                      tavg                = mean(tavg, na.rm = T),
+                      aet                 = mean(aet, na.rm = T),
+                      pet                 = mean(pet, na.rm = T),
+                      soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  ) %>%
+                  ungroup()
+                
+                # ---- Prep data for model ----
+                mod_df <- mlr_district %>%
+                  dplyr::select(short_dir_norm, 10:11, 13:27)
+                
+                # ---- MLR Model + stepwise regression ----
+                lm_vfit <- lm(short_dir_norm~., data = mod_df) %>%
+                              # rm_collinearity(vif_thresh = 3.5) %>%
+                              ols_step_forward_p()
+                
+                # ---- Select predictors from data ----
+                ws_predictors <- mlr_district %>%
+                    ungroup() %>%
+                    dplyr::select(year, lm_vfit$predictors[1:2]) %>%
+                    mutate(across(where(is.numeric), round, 2)) %>% 
+                    mutate(year = as.numeric(as.character(year)))
+                
+                # Fix names for axis, labels, titles
+                pred_names <- names(rename_all(ws_predictors, recode,
+                                        swe_max           = "SWE maximum",
+                                        prcp              = "Precipitation",
+                                        pdsi              = "PDSI",
+                                        pdsi_gridmet      = "PDSI (gridMET)",
+                                        eddi1             = "EDDI 1 month",
+                                        eddi3             = "EDDI 3 month",
+                                        eddi6             = "EDDI 6 month",
+                                        eddi12            = "EDDI 12 month",
+                                        spi1              = "SPI 1 month",
+                                        spi3              = "SPI 3 month",
+                                        spi6              = "SPI 6 month",
+                                        spi9              = "SPI 9 month",
+                                        spi12             = "SPI 12 month",
+                                        tavg              = "Average temperature (C)",
+                                        aet               = "Actual evapotranspiration",
+                                        pet               = "Potential Evapotranspiration",
+                                        soilm             = "Soil moisture")
+                                    )
+                
+                # ---- Predictors highchart ----
+                pred_hc <- 
+                 highchart() %>%
+                      hc_plotOptions(column = list(stacking = 'normal'),
+                                     line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
+                      hc_yAxis(title = list(text = "Water volume (Acre feet)"), min = 0) %>%
+                      hc_yAxis_multiples(
+                        list(title = list(
+                                text = pred_names[2],
+                                style = list(fontWeight = "bold",  fontSize = '1.3em')
+                                ),
+                             labels = list(style = list(fontSize =  '1.3em')),
+                                top = "0%",
+                                height = "50%" 
+                             ),
+                        list(title = list(
+                                text   = pred_names[3],
+                                style  = list(fontWeight = "bold",  fontSize = '1.3em')),
+                              labels = list(style = list(fontSize =  '1.3em')),
+                                top      = "50%", 
+                                height = "50%",
+                                opposite = TRUE)
+                        ) %>% 
+                      hc_xAxis(labels = list(style = list(fontSize =  '1.3em'))
+                               ) %>% 
+                      hc_add_series(
+                            data = ws_predictors, 
+                            name = pred_names[2],
+                            type = 'line',
+                            hcaes(x = year,  y = !!lm_vfit$predictors[1]),
+                            yAxis = 0,
+                            fillOpacity = 0.1) %>%
+                      hc_add_series(
+                            data = ws_predictors,
+                            name = pred_names[3],
+                            type = 'line', hcaes(x = year, y = !!lm_vfit$predictors[2]),
+                            yAxis = 1, fillOpacity = 0.1) %>%
+                      hc_xAxis(categories = ws_predictors$year) %>%
+                      hc_colors(c("darkblue",  "darkred")) %>%
+                      hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                
+                #  ---- render predictors HC plot ----
+                output$predictorTimeseries <- renderHighchart({
+                      pred_hc
+                })
+             }
+          }
+  })
+```
+
+
+
+Univariate linear regression 
+=====================================
+Inputs {.sidebar}
+----------------------------------------------------
+### **Linear Regression model:**
+
+*** 
+
+<br>
+
+##### **Dependent variable**
+```{r}
+selectInput(
+  "depVarInput",
+  label = NULL,
+  # selected = "short_norm",
+    # choices = as.list(outcome_lst$outcome_variable)
+  selected = "Total shortage",
+  choices = impacts_lst
+)
+```
+
+##### **Climate variable**
+```{r}
+selectInput(
+  "climVarInput",
+  label = NULL,
+  # selected = "prcp",
+  # choices = as.list(indepent_lst$independent_variable)
+  selected = "Precipitation",
+  choices = indicator_lst
+  # choices = as.list(indepent_lst2$independent_variable)
+  )
+```
+
+<br>
+
+<!-- #### **Submit** -->
+<!-- ```{r} -->
+<!-- actionButton( -->
+<!--   "submitButton", -->
+<!--   label = "Enter", -->
+<!--   class = "btn-primary btn-lg", -->
+<!--   icon("search") -->
+<!--   ) -->
+<!-- ``` -->
+
+***
+
+
+
+```{r context = "server"}
+# Dependent variable input reactive
+depVar <- reactive({
+  input$depVarInput
+})
+
+# climate variable input reactive
+climVar <- reactive({
+  input$climVarInput
+})
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+### 
+```{r}
+valueBoxOutput("districtBoxLM")
+```
+
+### Water districts
+```{r}
+leafletOutput("districtMapLM")
+```
+
+
+```{r context="server"}
+# render district value box at start
+output$districtBoxLM <- renderValueBox(
+                    valueBox(
+                      value = "District", 
+                      color = "success"
+                  )
+                )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMapLM_click, {
+   if(!is.null(input$districtMapLM_click)) {
+      click <- input$districtMapLM_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+
+          # District number value box
+          output$districtBoxLM <- renderValueBox(
+            valueBox(
+              value = paste0("District ", district_id$district),
+              color = "success"
+              )
+            )
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          bb = shp %>%
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          # Map 2 fly to bounds
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+       
+          leafletProxy("districtMapLM") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                    data = shp,
+                    color = "black",
+                    fillOpacity = 0.8,
+                    fillColor = ~pal(variance_rsq),
+                    weight = 2,
+                    label = ~DISTRICT,
+                    labelOptions = labelOptions(
+                      noHide = F,
+                      # direction = 'center',
+                      # textOnly = F)
+                      style = list(
+                        "color" = "black",
+                        "font-weight" = "1000")
+                  )
+                ) 
+              # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+       }
+    }
+})
+```
+
+
+```{r context="server"}
+# render district value box at start
+# output$districtBoxLM <- renderValueBox(
+#                     valueBox(
+#                       value = "District", 
+#                       color = "success"
+#                   )
+#                 )
+# output$splitBoxLM <- renderValueBox(
+#             valueBox(
+#               value = "Priority date",
+#               color   = "success"
+#               )
+#             )
+
+splitRightsLM <- eventReactive(input$districtMapLM_click, {
+   click <- input$districtMapLM_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+      if(nrow(pt_intersect) == 0) {
+          NULL
+         } else {
+            district_id <- pt_intersect %>%
+                rename(district = DISTRICT) %>%
+                mutate(district = as.numeric(district))
+            
+            # adm_date <- admin_dates %>% 
+            #    filter(admin_number == adminNum())
+             # filter(admin_number == 4900)
+            
+            # paste0(adminNum(), ": ", adm_date$date)
+            breaks2 <- breaks %>% 
+                    # filter(district == 7) %>%
+                    filter(district == district_id$district) %>%
+                    ungroup() %>% 
+                    filter(demand_cuml_tot == split) %>% 
+                    dplyr::select(admin_number) %>% 
+                    head(1)
+            adm_date <- admin_dates %>%
+                 filter(admin_number == breaks2[[1]])
+            paste0(breaks2$admin_number, ": ", adm_date$date)
+
+         }
+})
+
+
+# Water rights admin number split value box
+output$splitBoxLM <- renderValueBox(
+        valueBox(
+          value   = paste0(splitRightsLM()),
+          caption = "Priority date",
+          color   = "success"
+          )
+        )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMapLM_click, {
+   if(!is.null(input$districtMapLM_click)) {
+      click <- input$districtMapLM_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+          
+          # District number value box
+          output$districtBoxLM <- renderValueBox(
+            valueBox(
+              value = paste0("District ", district_id$district),
+              color = "success"
+              )
+          )
+          output$splitBoxLM <- renderValueBox(
+            valueBox(
+              value   = paste0(splitRightsLM()),
+              caption = "Priority date",
+              color   = "success"
+              )
+            )
+          bb = shp %>%
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          # Map 2 fly to bounds
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+          
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          
+          leafletProxy("districtMapLM") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                      data = shp,
+                      color = "black",
+                      fillOpacity = 0.8,
+                      fillColor = ~pal(variance_rsq),
+                      weight = 2,
+                      label = ~DISTRICT,
+                      labelOptions = labelOptions(
+                        noHide = F,
+                        # direction = 'center',
+                        # textOnly = F)
+                        style = list(
+                          "color" = "black",
+                          "font-weight" = "1000")
+                        )
+                      ) 
+              # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+       }
+    }
+})
+```
+
+### **Priority date**
+```{r}
+valueBoxOutput("splitBoxLM")
+```
+
+```{r context = "server"}
+observeEvent(input$districtMapLM_click, {
+   if(!is.null(input$districtMapLM_click)) {
+      click <- input$districtMapLM_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                 # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                      year          = as.factor(year),
+                      admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+
+                # ---- Join indicators & impacts data, summarize to district level ----
+                by_district <- left_join(
+                      ws_data,
+                      dplyr::select(short_year, year = wyear, district, 20:41),
+                      by = c("district", "year")
+                ) %>%
+                  # filter(district == 6) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T),
+                        af_total            = mean(af_total, na.rm = T),
+                        swe_max             = mean(swe_max, na.rm = T),
+                        prcp                = mean(prcp, na.rm = T),
+                        prcp_norm           = mean(prcp_norm, na.rm = T),
+                        pdsi                = mean(pdsi, na.rm = T),
+                        pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                        eddi1               = mean(eddi1, na.rm = T),
+                        eddi3               = mean(eddi3, na.rm = T),
+                        eddi6               = mean(eddi6, na.rm = T),
+                        eddi12              = mean(eddi12, na.rm = T),
+                        spi1                = mean(spi1, na.rm = T),
+                        spi3                = mean(spi3, na.rm = T),
+                        spi6                = mean(spi6, na.rm = T),
+                        spi9                = mean(spi9, na.rm = T),
+                        spi12               = mean(spi12, na.rm = T),
+                        tavg                = mean(tavg, na.rm = T),
+                        aet                 = mean(aet, na.rm = T),
+                        pet                 = mean(pet, na.rm = T),
+                        soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year)
+                  )
+                # ---- log transform data ----
+                trans_log <- by_district %>%
+                      mutate(
+                        short               = log10(short),
+                        short_dir           = log10(short_dir),
+                        short_norm          = log10(short_norm),
+                        short_dir_norm      = log10(short_dir_norm),
+                        aug_supply          = log10(aug_supply),
+                        aug_supply_norm     = log10(aug_supply_norm),
+                        supply              = log10(supply),
+                        supply_dir          = log10(supply_dir),
+                        demand              = log10(demand)
+                      )
+
+                  # replace Infinite w/ 0
+                is.na(trans_log) <- sapply(trans_log, is.infinite)
+                trans_log[is.na(trans_log)] <- 0
+
+                trans_log <- trans_log %>%
+                      # dplyr::select(short_dir_norm, prcp)
+                      dplyr::select(depVar(), climVar())
+
+                    # ---- Linear regression run, nested dataframe ----
+                lm_run <- trans_log %>%
+                        group_by(district) %>%
+                        nest(-district) %>%
+                        mutate(
+                          fit       = map(data,
+                                           # ~lm(short_dir_norm~prcp, data = .)),
+                                           ~lm(as.formula(
+                                             paste(depVar()," ~ ", climVar())
+                                           ),
+                                           data = .)),
+                          results   = map(fit, augment),
+                          tidied    = map(fit, tidy),
+                          metrics   = map(fit, glance)
+                        )
+                        # unnest(c(4)) %>%
+                        # # dplyr::select(district, short_dir_norm, prcp, .fitted) %>%
+                        # dplyr::select(district, !!depVar(), !!climVar(), .fitted) %>%
+                        # setNames(c("district", "dependent", "independent", "fitted"))
+                 tbl_data <- lm_run %>%
+                        unnest(c(metrics)) %>%
+                        dplyr::select(district, tidied, r_squared = r.squared, p_value = p.value) %>%
+                        unnest(c(tidied))  %>%
+                        ungroup() %>%
+                        dplyr::select(term, coefficient = estimate, r_squared, p_value) %>%
+                        mutate(
+                            coefficient   = round(coefficient, 3),
+                            r_squared     = round(r_squared,3),
+                            p_value       = round(p_value, 5)
+                               ) %>%
+                        # mutate(across(where(is.numeric), round, 3)) %>%
+                        # mutate(across(where(is.numeric), as.character)) %>%
+                        rename(
+                            # District      = district,
+                            Term          = term,
+                            Coefficient   = coefficient,
+                            "R Squared"   = r_squared,
+                            "p-value"     = p_value
+                        )
+                   # pivot_longer(cols = c(Coefficient:`p-value`))
+                  customGreen0 = "#DeF7E9"
+                  customGreen = "#71CA97"
+                  customRed = "#ff7f7f"
+                  improvement_formatter <-
+                        formatter("span",
+                                  style = x ~ style(
+                                    font.weight = "bold",
+                                    color = ifelse(x > 0, customGreen, ifelse(x < 0, customRed, "black"))
+                                    )
+                                  )
+                  format_tbl <-
+                    formattable(tbl_data,
+                                align = c("l",rep("r", NCOL(tbl_data) - 1)),
+                                list(
+                                  `Term` = formatter("span", style = ~ style(color = "black", font.weight = "bold")),
+                                  `Coefficient` = improvement_formatter,
+                                  area(col = 3:4) ~ color_tile("#EAECEE", "#EAECEE"))
+                                )
+
+                  output$modelSummary <- renderFormattable({
+                    format_tbl
+                  })
+             }
+          }
+  })
+```
+
+### Model summary {data-height=100}
+```{r}
+formattable::formattableOutput("modelSummary")
+```
+
+Column {data-width=550}
+-------------------------------------
+### Model
+```{r}
+# plotly::plotlyOutput("wsTimeseries")
+highcharter::highchartOutput("LMplot")
+# verbatimTextOutput("LMplot")
+```
+
+```{r context = "server"}
+observeEvent(input$districtMapLM_click, {
+   if(!is.null(input$districtMapLM_click)) {
+      click <- input$districtMapLM_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                      year          = as.factor(year),
+                      admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+#                 
+#                 # ---- Join indicators & impacts data, summarize to district level ----
+                by_district <- left_join(
+                        ws_data,
+                        dplyr::select(short_year, year = wyear, district, 20:41),
+                        by = c("district", "year")
+                        ) %>%
+                  # filter(district == 6) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T),
+                        af_total            = mean(af_total, na.rm = T),
+                        swe_max             = mean(swe_max, na.rm = T),
+                        prcp                = mean(prcp, na.rm = T),
+                        prcp_norm           = mean(prcp_norm, na.rm = T),
+                        pdsi                = mean(pdsi, na.rm = T),
+                        pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                        eddi1               = mean(eddi1, na.rm = T),
+                        eddi3               = mean(eddi3, na.rm = T),
+                        eddi6               = mean(eddi6, na.rm = T),
+                        eddi12              = mean(eddi12, na.rm = T),
+                        spi1                = mean(spi1, na.rm = T),
+                        spi3                = mean(spi3, na.rm = T),
+                        spi6                = mean(spi6, na.rm = T),
+                        spi9                = mean(spi9, na.rm = T),
+                        spi12               = mean(spi12, na.rm = T),
+                        tavg                = mean(tavg, na.rm = T),
+                        aet                 = mean(aet, na.rm = T),
+                        pet                 = mean(pet, na.rm = T),
+                        soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year))
+                # --- UNCLEAN NAME SUMMARIZE ----
+#                   summarise(
+#                       "Total shortage"               = sum(short, na.rm = T),
+#                             "Direct shortage"        = sum(short_dir, na.rm = T),
+#                              demand   = sum(demand, na.rm = T),
+#                                 supply   = sum(supply, na.rm = T),
+#                                 supply_dir = sum(supply_dir, na.rm = T),
+#                            "Natural flows"     =mean(af_total, na.rm = T),
+#                                   "SWE maximum"=   mean(swe_max, na.rm = T), 
+#                                    "Precipitation"=       mean(prcp, na.rm = T), 
+#                                prcp_norm   =mean(prcp_norm, na.rm = T),
+#                                 "PDSI"=      mean(pdsi, na.rm = T), 
+#                                "PDSI (gridMET)"=    mean(pdsi_gridmet, na.rm = T), 
+#                                 "EDDI 1 month"=    mean(eddi1, na.rm = T), 
+#                                 "EDDI 3 month"=       mean(eddi3, na.rm = T), 
+#                                    "EDDI 6 month"=      mean(eddi6, na.rm = T), 
+#                                   "EDDI 12 month"=    mean(eddi12, na.rm = T), 
+#                                    "SPI 1 month"   = mean(spi1, na.rm = T),
+#                                     "SPI 3 month"  = mean(spi3, na.rm = T),
+#                                    "SPI 6 month"   = mean(spi6, na.rm = T),
+#                                    "SPI 9 month" = mean(spi9, na.rm = T),
+#                                     "SPI 12 month" = mean(spi12, na.rm = T),
+#                                        "Average temperature (C)" = mean(tavg, na.rm = T), 
+#                                     "Actual evapotranspiration"   = mean(aet, na.rm = T),
+#                                   "Potential Evapotranspiration"  = mean(pet, na.rm = T),
+#                                  "Soil moisture"  = mean(soilm, na.rm = T)
+#                   ) %>% 
+#                   mutate(
+#                         "Normalized total shortage"          = 100*(round(`Total shortage`/demand, 3)),
+#                         "Normalized direct shortage"      = 100*(round(`Direct shortage`/demand, 3)),
+#                          # "Total shortage"               = log10(`Total shortage`),
+#                          #    "Direct shortage"        = log10(`Direct shortage`),
+#                         # "Normalized total shortage"          = log10(100*(round(`Total shortage`/demand, 3))),
+#                         # "Normalized direct shortage"      = log10(100*(round(`Direct shortage`/demand, 3))),
+#                         #  "Total shortage"               = log10(`Total shortage`),
+#                         #     "Direct shortage"        = log10(`Direct shortage`),
+#                         # aug_supply          = round((supply - supply_dir), 3),
+#                         # aug_supply_norm     = round(100*(aug_supply/supply), 3), 
+#                         year                = as.factor(year))
+                # ------
+                
+                                     # Fix names for axis, labels, titles
+                # names(by_district) <- names(rename_all(by_district, recode,
+                #                                short             = "Total shortage",
+                #                                short_dir         = "Direct shortage",
+                #                                short_norm        = "Normalized total shortage",
+                #                                short_dir_norm    = "Normalized direct shortage",
+                #                                af_total          = "Natural flows",
+                #                                swe_max           = "SWE maximum",
+                #                                prcp              = "Precipitation",
+                #                                pdsi              = "PDSI",
+                #                                pdsi_gridmet      = "PDSI (gridMET)",
+                #                                eddi1             = "EDDI 1 month",
+                #                                eddi3             = "EDDI 3 month",
+                #                                eddi6             = "EDDI 6 month",
+                #                                eddi12            = "EDDI 12 month",
+                #                                spi1              = "SPI 1 month",
+                #                                spi3              = "SPI 3 month",
+                #                                spi6              = "SPI 6 month",
+                #                                spi9              = "SPI 9 month",
+                #                                spi12             = "SPI 12 month",
+                #                                tavg              = "Average temperature (C)",
+                #                                aet               = "Actual evapotranspiration",
+                #                                pet               = "Potential Evapotranspiration",
+                #                                soilm             = "Soil moisture")
+                # )
+                
+                #  # ---- log transform data ----
+                # trans_log <- by_district %>%
+                #       mutate(
+                #         `Total shortage`                  = log10(`Total shortage`),
+                #         `Direct shortage`                 = log10(`Direct shortage`),
+                #         `Normalized total shortage`       = log10(`Normalized total shortage`),
+                #         `Normalized direct shortage`      = log10(`Normalized direct shortage`)
+                #         # aug_supply          = log10(aug_supply),
+                #         # aug_supply_norm     = log10(aug_supply_norm),
+                #         # supply              = log10(supply),
+                #         # supply_dir          = log10(supply_dir),
+                #         # demand              = log10(demand)
+                #       )
+              
+                # # ---- log transform data ----
+                trans_log <- by_district %>%
+                      mutate(
+                        short               = log10(short),
+                        short_dir           = log10(short_dir),
+                        short_norm          = log10(short_norm),
+                        short_dir_norm      = log10(short_dir_norm),
+                        aug_supply          = log10(aug_supply),
+                        aug_supply_norm     = log10(aug_supply_norm),
+                        supply              = log10(supply),
+                        supply_dir          = log10(supply_dir),
+                        demand              = log10(demand)
+                      )
+                
+              #     # replace Infinite w/ 0
+                  is.na(trans_log) <- sapply(trans_log, is.infinite)
+                  trans_log[is.na(trans_log)] <- 0
+              #     
+              #     print(paste0("hi2"))
+              #     print(paste0(depVar()))
+                  trans_log <- trans_log %>%
+                      # dplyr::select(short_dir_norm, prcp)
+                      dplyr::select(depVar(), climVar())
+              # print(as.formula(paste0(paste0(depVar())," ~ ", paste0(climVar()))))
+                  # 
+                  # #   # ---- Linear regression run, nested dataframe ----
+                  lm_run <- trans_log %>%
+                        group_by(district) %>%
+                        nest(-district) %>%
+                        mutate(
+                          fit       = map(data,
+                                           # ~lm(short_dir_norm~prcp, data = .)),
+                                           ~lm(as.formula(
+                                             paste0(depVar()," ~ ", climVar())
+                                           ),
+                                           data = .)),
+                          results   = map(fit, augment),
+                          tidied    = map(fit, tidy),
+                          metrics   = map(fit, glance)
+                        ) %>%
+                        unnest(c(4)) %>%
+                        dplyr::select(district, short_dir_norm, prcp, .fitted) %>%
+                       # dplyr::select(district, `Normalized direct shortage`, `Precipitation`, Fitted = .fitted)
+                        # dplyr::select(district, depVar(), climVar(), Fitted = .fitted) %>% 
+                        setNames(c("district", "Dependent", "Independent", "Fitted"))
+                  # output$LMplot <- renderText({
+                  #   paste0(trans_log)
+                  # })
+                    # # Extract fitted values and back transform Logs
+                    mod_vals <- lm_run %>%
+                        ungroup() %>%
+                        # mutate(
+                        #     # `Normalized direct shortage`          = 10^lm_run$`Normalized direct shortage`,
+                        #     depVar()                              = 10^lm_run$depVar(),
+                        #     Fitted                                = 10^lm_run$Fitted
+                        # ) %>%
+                        mutate(
+                            Dependent          = 10^lm_run$Dependent,
+                            Fitted             = 10^lm_run$Fitted
+                        ) %>%
+                        mutate(across(where(is.numeric), round, 1))
+                    # 
+                    # 
+                    # # names(mod_vals) <- janitor::make_clean_names(names(mod_vals), "title")
+                    # # density_vals <- density(mod_vals$`Normalized direct shortage`)
+                    # density_vals <- density(mod_vals$!!depVar())
+                    # density_yaxis <- density_vals$y
+
+                    density_vals <- density(mod_vals$Independent)
+                    density_yaxis <- density_vals$y
+                    # 
+                    # # lm_hc <- 
+                    # #   highchart() %>%
+                    # #       hc_plotOptions(line = list(marker = list(enabled = FALSE), lineWidth = 5)) %>%
+                    # #       # hc_yAxis(title = list(text = "Dependent variable")) %>%
+                    # #       # hc_xAxis(title = list(text = "Fitted values")) %>%
+                    # #       hc_add_series(
+                    # #           data = dplyr::arrange(mod_vals, Independent),
+                    # #           type = 'point',
+                    # #           name = "Observed",
+                    # #           hcaes(x = Independent, y = Dependent),
+                    # #           fillOpacity = 0.5) %>%
+                    # #       hc_add_series(
+                    # #           data = dplyr::arrange(mod_vals, Independent),
+                    # #           type = 'spline',
+                    # #           name = "Fitted",
+                    # #           hcaes(x = Independent, y = Fitted),
+                    # #           fillOpacity = 0.5
+                    # #           )  %>% 
+                    # #   hc_colors(c("darkblue",  "black")) %>%
+                    # #   hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                    lm_hc <-
+                      highchart() %>%
+                          hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+                                         scatter = list(marker = list(symbol = "circle"))) %>%
+                          hc_yAxis_multiples(
+                                # list(title = list(text = paste0(!!climVar(), " distribution")), min = 0, max = max(density_yaxis), opposite = TRUE),
+                                # list(title = list(text = paste0(!!depVar())), min = 0, max = max(mod_vals$!!depVar()))
+                                list(title = list(text = "Distribution",    
+                                                  style = list(fontWeight = "bold",  fontSize = '1.4em')), 
+                                     labels = list(style = list(fontSize =  '1.3em')),
+                                     min = 0, max = max(density_yaxis), opposite = TRUE),
+                                list(title = list(text = "Dependent variable", 
+                                                  style = list(fontWeight = "bold", fontSize = '1.4em'),
+                                     labels = list(style = list(fontSize =  '1.3em')), 
+                                     min = 0, max = max(mod_vals$Dependent))
+                                     ))%>%
+                          hc_xAxis(
+                              # title = list(
+                              #     style = list(
+                              #         fontWeight = "bold",   # Bold
+                              #         fontSize = '1.4em'    # 1.4 x tthe size of the default text
+                              #         # color = "#7cb5ec"      # Hex code for the default blue
+                              #     ))
+                               labels = list(style = list(fontSize =  '1.3em'))
+                               ) %>%
+                          hc_add_series(
+                            data = density(mod_vals$Independent),
+                            # data = density(mod_vals$!!climVar()),
+                            type = 'area',
+                            # name = paste0(!!climVar(), " distribution"),
+                            name = "Climate variable distribution",
+                            yAxis = 0,
+                            fillOpacity = 0.5) %>%
+                          # hc_yAxis(title = list(text = "Dependent variable")) %>%
+                          # hc_xAxis(title = list(text = "Fitted values")) %>%
+                          hc_add_series(
+                            data = dplyr::arrange(mod_vals, Independent),
+                            # data = dplyr::arrange(mod_vals, `Precipitation`),
+                            type = 'scatter',
+                            name = "Observed",
+                            # hcaes(x = Independent, y = Dependent),
+                            # hcaes(x = `Precipitation`, y =  `Normalized direct shortage`),
+                            hcaes(x = Independent, y =  Dependent),
+                            yAxis = 1,
+                            fillOpacity = 0.5) %>%
+                          hc_add_series(
+                            data = dplyr::arrange(mod_vals, Independent),
+                            # data = dplyr::arrange(mod_vals, !!climVar()),
+                            type = 'line',
+                            name = "Fitted",
+                            # hcaes(x = `Precipitation`, y = Fitted),
+                            hcaes(x = Independent, y = Fitted),
+                            yAxis = 1,
+                            fillOpacity = 0.5
+                          )  %>%
+                          hc_colors(c("#91BEEA", "#34495E", "black")) %>% # "#5D6D7E"
+                          hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                        #  ---- render predictors HC plot ----
+                    output$LMplot <- renderHighchart({
+                          lm_hc
+                })
+                  # output$LMplot <- renderText({
+                  #   lm_run
+                  # })
+             }
+   }
+})
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

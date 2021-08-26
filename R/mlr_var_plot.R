@@ -73,21 +73,96 @@ mlr_district <- left_join(
   ) %>%
   ungroup()
 
+
+
 mod_df <- mlr_district %>%
   dplyr::select(short_dir_norm, 10:11, 13:27)
 
 lm_vfit <- lm(short_dir_norm~., data = mod_df) %>%
               rm_collinearity(vif_thresh = 3.5) %>%
               ols_step_forward_p()
-
-summary(lm_vfit$model)
-lm_vfit$predictors[1:2]
-
+lm_vfit$indvar
+pred_names <- lm_vfit$predictors[1:2]
+as.name(pred_names[2])
+as.name()
 ws_predictors <- mlr_district %>%
     ungroup() %>%
     dplyr::select(year, lm_vfit$predictors[1:2])
-# saveRDS(lm_vfit, "lm_vfit.rds")
-# saveRDS(ws_predictors, "predictors_df.rds")
+to_any_case(names(ws_predictors), case = "title")
+
+pred_names <- names(rename_all(ws_predictors, recode,
+              swe_max                            = "SWE maximum",
+              prcp                               = "Precipitation",
+              pdsi                               = "PDSI",
+              pdsi_gridmet                       = "PDSI (gridMET)",
+              eddi1                              = "EDDI 1 month",
+              eddi3                              = "EDDI 3 month",
+              eddi6                              = "EDDI 6 month",
+              eddi12                             = "EDDI 12 month",
+              spi1                               = "SPI 1 month",
+              spi3                               = "SPI 3 month",
+              spi6                               = "SPI 6 month",
+              spi9                               = "SPI 9 month",
+              spi12                              = "SPI 12 month",
+              tavg                               = "Average temperature (C)",
+              aet                                = "Actual evapotranspiration",
+              pet                                = "Potential Evapotranspiration",
+              soilm                              = "Soil moisture"
+          ) )
+#   "SWE maximum"                = swe_max,
+#   "Precipitation"                 = prcp,
+#   "PDSI"                          = pdsi,
+#   "PDSI (gridMET)"                = pdsi_gridmet,
+#   "EDDI 1 month"                  = eddi1,
+#   "EDDI 3 month"                  = eddi3,
+#   "EDDI 6 month"                  = eddi6,
+#   "EDDI 12 month"                 = eddi12,
+#   "SPI 1 month"                   = spi1,
+#   "SPI 3 month"                   = spi3,
+#   "SPI 6 month"                   = spi6,
+#   "SPI 9 month"                   = spi9,
+#   "SPI 12 month"                  = spi12,
+#   "Average temperature (C)"       = tavg,
+#   "Actual evapotranspiration"     = aet,
+#   "Potential Evapotranspiration"  = pet,
+#   "Soil moisture"                 = soilm
+# )
+  names(ws_predictors)[2]
+  library(snakecase)
+
+highchart() %>%
+  hc_plotOptions(column = list(stacking = 'normal')) %>%
+  hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
+  hc_yAxis_multiples(
+    list(title = list(
+      # text = lm_vfit$predictors[1]),
+      text = pred_names[2]),
+         top = "0%", height = "50%"
+         # min = 0,
+         # max = max(ws_predictors$swe_max)
+         ),
+    list(title = list(
+      text = pred_names[3]),
+      # text = lm_vfit$predictors[2]),
+         # min = 0,
+         # max =max(ws_predictors$aet),
+         top = "50%", height = "50%", opposite = TRUE)
+    ) %>%
+  hc_add_series(
+    data = ws_predictors,
+    name = pred_names[2],
+    type = 'line',
+    hcaes(x = year,  y = !!lm_vfit$predictors[1]),
+    yAxis = 0,
+    fillOpacity = 0.1) %>%
+  hc_add_series(
+    data = ws_predictors,
+    name = pred_names[3],
+    type = 'line', hcaes(x = year, y = !!lm_vfit$predictors[2]),
+    yAxis = 1, fillOpacity = 0.1) %>%
+  hc_xAxis(categories = ws_predictors$year) %>%
+  hc_colors(c("darkblue",  "darkred")) %>%
+  hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
 
 ws_pred_long <- ws_predictors %>%
   pivot_longer(c(-year)) %>%
@@ -100,8 +175,7 @@ ggplot() +
   #   "mpg (US)",
   #   sec.axis = sec_axis(~ . * 5, name = "mpg (UK)")
   # )
-pred1 <- lm_vfit$predictor[1]
-lm_vfit$predictors
+
 
 highchart() %>%
     hc_plotOptions(column = list(stacking = 'normal')) %>%
@@ -115,17 +189,17 @@ highchart() %>%
     hc_add_series(
       data = ws_predictors, name = lm_vfit$predictors[1],
       type = 'line',
-      hcaes(x = year,
-            y = lm_vfit$predictors[1]),
+      hcaes(x = year,  y = !!lm_vfit$predictors[1]),
       yAxis = 0,
       fillOpacity = 0.1) %>%
     hc_add_series(
       data = ws_predictors, name = lm_vfit$predictors[2],
-      type = 'line', hcaes(x = year, y = aet),
+      type = 'line', hcaes(x = year, y = !!lm_vfit$predictors[2]),
       yAxis = 1, fillOpacity = 0.1) %>%
     hc_xAxis(categories = ws_predictors$year) %>%
     hc_colors(c("darkblue",  "darkred")) %>%
     hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+
 highchart() %>%
       hc_plotOptions(column = list(stacking = 'normal')) %>%
       hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
@@ -139,7 +213,7 @@ highchart() %>%
         # yAxis = 0,
         fillOpacity = 0.1
       )
-install.packages("dplyr")
+
 highchart() %>%
   hc_plotOptions(column = list(stacking = 'normal')) %>%
   hc_yAxis(title = list(text = "Water volume (units)"), min = 0) %>%
@@ -148,7 +222,7 @@ highchart() %>%
     name = lm_vfit$predictors[2],
     type = "line",
     hcaes_string(x = "year",
-                 y =  lm_vfit$predictors[2]),
+                 y =  "swe_max"),
     yAxis = 0,
     fillOpacity = 0.1
   )
@@ -172,7 +246,51 @@ highchart() %>%
 
 
 
-
+highchart() %>%
+  hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+                 scatter = list(marker = list(symbol = "circle"))) %>%
+  hc_yAxis_multiples(
+    # list(title = list(text = paste0(!!climVar(), " distribution")), min = 0, max = max(density_yaxis), opposite = TRUE),
+    # list(title = list(text = paste0(!!depVar())), min = 0, max = max(mod_vals$!!depVar()))
+    list(title = list(text = "Distribution",
+                      style = list(fontWeight = "bold",  fontSize = '1.4em')),
+         labels = list(style = list(fontSize =  '1.3em')),
+         min = 0, max = max(density_yaxis), opposite = TRUE),
+    list(title = list(text = "Dependent variable",
+                      style = list(fontWeight = "bold", fontSize = '1.4em'),
+         labels = list(style = list(fontSize =  '1.3em')),
+         min = 0, max = max(mod_vals$Dependent))
+         ))%>%
+  hc_xAxis(
+  # title = list(
+  #     style = list(
+  #         fontWeight = "bold",   # Bold
+  #         fontSize = '1.4em'    # 1.4 x tthe size of the default text
+  #         # color = "#7cb5ec"      # Hex code for the default blue
+  #     ))
+  labels = list(style = list(fontSize =  '1.3em'))
+  ) %>%
+  hc_add_series(
+    data = density(mod_vals$Independent),
+    # data = density(mod_vals$!!climVar()),
+    type = 'area',
+    # name = paste0(!!climVar(), " distribution"),
+    name = "Climate variable distribution",
+    yAxis = 0,
+    fillOpacity = 0.5) %>%
+  # hc_yAxis(title = list(text = "Dependent variable")) %>%
+  # hc_xAxis(title = list(text = "Fitted values")) %>%
+  hc_add_series(
+    data = dplyr::arrange(mod_vals, Independent),
+    # data = dplyr::arrange(mod_vals, `Precipitation`),
+    type = 'scatter',
+    name = "Observed",
+    # hcaes(x = Independent, y = Dependent),
+    # hcaes(x = `Precipitation`, y =  `Normalized direct shortage`),
+    hcaes(x = Independent, y =  Dependent),
+    yAxis = 1,
+    fillOpacity = 0.5)
+lm_hc
 
 
 
