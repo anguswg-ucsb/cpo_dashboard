@@ -1,0 +1,1228 @@
+---
+title: "CPO"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    css: www/custom.css
+    navbar:
+      - { icon: "fa-question-circle", href: "https://github.com/anguswg-ucsb/drought_data_processing", align: right }
+    theme: cerulean
+    orientation: columns
+    source_code: embed
+    vertical_layout: fill
+---
+
+```{r setup, include = FALSE}
+# Shiny & Flexdashboard libraries
+library(shiny)
+library(flexdashboard)
+
+# Data libraries
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(kableExtra)
+library(broom)
+library(leaflet)
+library(sf)
+library(tools)
+library(highcharter)
+library(olsrr)
+library(formattable)
+library(shinyalert)
+
+source('data_utils.R')
+```
+
+ 
+
+```{r context="server"}
+useShinyalert(rmd = TRUE)
+
+# districts for analysis
+distr_num <- c(1,  2,  4,  5,  6,  7,  8,  9,  23, 64, 80,
+               36, 37, # 38, 
+               39, 45, 50, 51, 52, 53, 70, 72)
+
+
+# indicator_lst <- list(
+#   "Precipitation (mm)"                 = "prcp",
+#   "SWE maximum (in)"                   = "swe_max",
+#   "Average temperature (C)"            = "tavg",
+#   "Actual Evapotranspiration (mm)"     = "aet",
+#   "Potential Evapotranspiration (mm)"  = "pet",
+#   "Soil moisture (mm)"                 = "soilm",
+#   "PDSI"                               = "pdsi",
+#   "PDSI (gridMET)"                     = "pdsi_gridmet",
+#   "EDDI 1 month"                       = "eddi1",
+#   "EDDI 3 month"                       = "eddi3",
+#   "EDDI 6 month"                       = "eddi6", 
+#   "EDDI 12 month"                      = "eddi12",
+#   "SPI 1 month"                        = "spi1",
+#   "SPI 3 month"                        = "spi3",
+#   "SPI 6 month"                        = "spi6",
+#   "SPI 9 month"                        = "spi9",
+#   "SPI 12 month"                       = "spi12"
+#   )
+
+clim_model_indicator_lst <- list(
+  "Precipitation (mm)"                 = "prcp",
+  "Average temperature (C)"            = "tavg",
+  "Actual Evapotranspiration (mm)"  = "aet",
+  "PDSI"                               = "pdsi",
+  # "Potential Evapotranspiration (mm)"  = "et_harg",
+  # "PDSI (Hargreaves)"                  = "pdsi_harg",
+  "SPI 1 month"                        = "spi1",
+  "SPI 3 month"                        = "spi3",
+  "SPI 6 month"                        = "spi6",
+  "SPI 9 month"                        = "spi9",
+  "SPI 12 month"                       = "spi12"
+  )
+
+impacts_lst <- list(
+  "Total shortage (acre feet)"                 = "short",
+  "Normalized total shortage (% of demand)"    = "short_norm",
+  "Direct shortage (acre feet)"                = "short_dir",
+  "Normalized direct shortage (% of demand)"   = "short_dir_norm",
+  "Demand (acre feet)"                         = "demand",
+  "Supply (acre feet)"                         = "supply",
+  "Direct supply (acre feet)"                  = "supply_dir",
+  "Natural flows (acre feet)"                  = "af_total"
+)
+
+dataset_lst <- list("MACA", "BCCA", "LOCA")
+
+# short_year <- readRDS("model_data_year_v2")
+short_year <- readRDS("model_data_year_v3.rds")
+
+
+breaks <- readRDS("admin_breaks.rds")
+
+
+admin_dates <- readRDS("admin_dates.rds") %>% 
+  mutate(date = as.character(date))
+
+by_admin <- readRDS("by_admin.rds")
+
+# district shapefile path
+shp_path = "water_districts_simple.geojson"
+
+ # load shapefiles as spatial polygon object
+shp <- sf::read_sf(paste0(shp_path), quiet = TRUE) %>%
+  filter(DISTRICT %in% distr_num) %>%
+  st_transform(4326) %>% 
+  st_cast("MULTIPOLYGON")
+
+# Tidied MLR results by district
+tidy_mlr <- readRDS("tidy_mlr.rds")
+
+shp <- left_join(shp, tidy_mlr, by = c("DISTRICT" = "district"))
+
+font <- list(
+  # family      = "DM Sans",
+  size        = 12,
+  color       = "white"
+  )
+
+label <- list(
+  bgcolor     = "#232F34",
+  bordercolor = "transparent",
+  font        = font
+  )
+
+# node_pts <- readRDS("node_pts.rds")
+node_pts <- readRDS("node_pts2.rds")
+
+# ditch_data <- readRDS("ditch_data.rds")
+ditch_data <- readRDS("ditch_data2.rds")
+
+climate_models <- readRDS("climate_models.rds") %>% 
+  rename(aet = et_thorn, aet_harg = et_harg, pdsi = pdsi_thorn)
+
+# Initialize Maps 
+output$districtMapFuture    <- renderLeaflet({ basemap(shp = shp) })
+```
+
+Climate change impacts
+=====================================
+Inputs {.sidebar}
+----------------------------------------------------
+### **Model inputs:**
+
+*** 
+
+<br>
+
+##### **Climate model**
+```{r}
+selectInput(
+  "datasetInput",
+  label = NULL,
+  # selected = "short_norm",
+    # choices = as.list(outcome_lst$outcome_variable)
+  selected = "MACA",
+  choices = dataset_lst
+)
+```
+
+##### **Dependent variables**
+```{r}
+selectInput(
+  "depClimChangeInput",
+  label = NULL,
+  # selected = "short_norm",
+    # choices = as.list(outcome_lst$outcome_variable)
+  selected = "Total shortage",
+  choices = impacts_lst
+)
+```
+
+<br>
+<br>
+
+##### **Drought indicators**
+```{r}
+selectInput(
+  "climChangeVarInput",
+  label = NULL,
+  # selected = "prcp",
+  # choices = as.list(indepent_lst$independent_variable)
+  selected = "Precipitation",
+  choices = clim_model_indicator_lst
+  # choices = as.list(indepent_lst2$independent_variable)
+  )
+
+# actionButton(
+#   "climVarHelpButton",
+#   # label = "Help",
+#   # class = "btn-primary btn-lg",
+#   icon("question")
+#   )
+# 
+# observeEvent(input$climVarHelpButton, {
+#   shinyalert(title = "Hey",
+#              showCancelButton = TRUE,
+#              closeOnClickOutside = TRUE,
+#              text = "Info on Drought indicators")
+# })
+
+```
+
+<br>
+
+####
+```{r}
+actionButton(
+  "submitButton2",
+  label = "Run model",
+  class = "btn-primary btn-lg",
+  icon("play")
+  )
+```
+
+<!-- ###  -->
+<!-- ```{r} -->
+<!-- actionButton( -->
+<!--   "modelRunHelpButton", -->
+<!--   # label = "Help", -->
+<!--   # class = "btn-primary btn-lg", -->
+<!--   icon("question") -->
+<!--   ) -->
+
+<!-- observeEvent(input$modelRunHelpButton, { -->
+<!--   shinyalert(title = "Hey", -->
+<!--              closeOnClickOutside = TRUE, -->
+<!--              showCancelButton = TRUE, -->
+<!--              text = "Press this button to run the model") -->
+<!-- }) -->
+<!-- ``` -->
+
+***
+
+
+
+```{r context = "server"}
+# Dependent variable input reactive
+futureDepVar <- reactive({
+  input$depClimChangeInput
+})
+
+# climate variable input reactive
+futureClimVar <- reactive({
+  input$climChangeVarInput
+})
+
+climModel <- reactive({
+  input$datasetInput
+})
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+### 
+```{r}
+valueBoxOutput("districtBoxFuture")
+```
+
+### Water districts
+```{r}
+leafletOutput("districtMapFuture")
+```
+
+
+```{r context="server"}
+# render district value box at start
+output$districtBoxFuture <- renderValueBox(
+                    valueBox(
+                      value = "District", 
+                      color = "success"
+                  )
+                )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMapFuture_click, {
+   if(!is.null(input$districtMapFuture_click)) {
+      click <- input$districtMapFuture_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+
+          # District number value box
+          output$districtBoxFuture <- renderValueBox(
+            valueBox(
+              value = paste0("District ", district_id$district),
+              color = "success"
+              )
+            )
+          
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          
+          bb = shp %>%
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          # Map 2 fly to bounds
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+       
+          leafletProxy("districtMapFuture") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                    data = shp,
+                    fillColor = 'white',
+                    fillOpacity = 0.5,
+                    col = "black",
+                    weight = 3,
+                    label = ~DISTRICT,
+                    labelOptions = labelOptions(
+                        noHide = F,
+                        # direction = 'center',
+                        # textOnly = F)
+                        style = list(
+                          "color" = "black",
+                          "font-weight" = "1000")
+                      )
+                  ) %>%
+              addScaleBar("bottomleft") %>%
+              addMeasure(
+                position = "bottomleft",
+                  primaryLengthUnit = "feet",
+                  primaryAreaUnit = "sqmiles",
+                  activeColor = "red",
+                  completedColor = "green" ) %>%
+            leafem::addMouseCoordinates() %>% 
+            flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+              # addPolygons(
+              #       data = shp,
+              #       color = "black",
+              #       fillOpacity = 0.8,
+              #       fillColor = ~pal(variance_rsq),
+              #       weight = 2,
+              #       label = ~DISTRICT,
+              #       labelOptions = labelOptions(
+              #         noHide = F,
+              #         # direction = 'center',
+              #         # textOnly = F)
+              #         style = list(
+              #           "color" = "black",
+              #           "font-weight" = "1000")
+              #     )
+             
+              # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+       }
+    }
+})
+```
+
+
+```{r context="server"}
+# render district value box at start
+# output$districtBoxFuture <- renderValueBox(
+#                     valueBox(
+#                       value = "District", 
+#                       color = "success"
+#                   )
+#                 )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMapFuture_click, {
+   if(!is.null(input$districtMapFuture_click)) {
+      click <- input$districtMapFuture_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+          
+          # District number value box
+          output$districtBoxFuture <- renderValueBox(
+            valueBox(
+              value = paste0("District ", district_id$district),
+              color = "success"
+              )
+          )
+          # output$splitBoxLM <- renderValueBox(
+          #   valueBox(
+          #     value   = paste0(splitRightsLM()),
+          #     caption = "Priority date",
+          #     color   = "success"
+          #     )
+          #   )
+          bb = shp %>%
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          # Map 2 fly to bounds
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+          
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          
+          leafletProxy("districtMapFuture") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                    data = shp,
+                    fillColor = 'white',
+                    fillOpacity = 0.5,
+                    col = "black",
+                    weight = 3,
+                    label = ~DISTRICT,
+                    labelOptions = labelOptions(
+                        noHide = F,
+                        # direction = 'center',
+                        # textOnly = F)
+                        style = list(
+                          "color" = "black",
+                          "font-weight" = "1000")
+                      )
+                  ) %>%
+              addScaleBar("bottomleft") %>%
+              addMeasure(
+                position = "bottomleft",
+                  primaryLengthUnit = "feet",
+                  primaryAreaUnit = "sqmiles",
+                  activeColor = "red",
+                  completedColor = "green" ) %>%
+            leafem::addMouseCoordinates() %>% 
+            flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+              # addPolygons(
+              #         data = shp,
+              #         color = "black",
+              #         fillOpacity = 0.8,
+              #         fillColor = ~pal(variance_rsq),
+              #         weight = 2,
+              #         label = ~DISTRICT,
+              #         labelOptions = labelOptions(
+              #           noHide = F,
+              #           # direction = 'center',
+              #           # textOnly = F)
+              #           style = list(
+              #             "color" = "black",
+              #             "font-weight" = "1000")
+              #           )
+              #         ) 
+              # flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+       }
+    }
+})
+
+# ---- PRIORITY DATE ----
+# output$splitBoxLM <- renderValueBox(
+#             valueBox(
+#               value = "Priority date",
+#               color   = "success"
+#               )
+#             )
+
+# splitRightsLM <- eventReactive(input$submitButton, {
+#    click <- input$districtMapFuture_click %>%
+#         data.frame() %>%
+#         dplyr::select(lat,lng)
+# 
+#       pt <- sf::st_as_sf(
+#         click,
+#         coords = c("lng", "lat"),
+#         crs = 4326
+#         )
+# 
+#       # point intersection w/ polygons
+#       pt_intersect <-  st_filter(shp, pt)
+# 
+#       # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+#       if(nrow(pt_intersect) == 0) {
+#           NULL
+#          } else {
+#             district_id <- pt_intersect %>%
+#                 rename(district = DISTRICT) %>%
+#                 mutate(district = as.numeric(district))
+#             
+#             # adm_date <- admin_dates %>% 
+#             #    filter(admin_number == adminNum())
+#              # filter(admin_number == 4900)
+#             
+#             # paste0(adminNum(), ": ", adm_date$date)
+#             breaks2 <- breaks %>% 
+#                     # filter(district == 7) %>%
+#                     filter(district == district_id$district) %>%
+#                     ungroup() %>% 
+#                     filter(demand_cuml_tot == split) %>% 
+#                     dplyr::select(admin_number) %>% 
+#                     head(1)
+#             adm_date <- admin_dates %>%
+#                  filter(admin_number == breaks2[[1]])
+#             paste0(breaks2$admin_number, ": ", adm_date$date)
+# 
+#          }
+# })
+
+
+# Water rights admin number split value box
+# output$splitBoxLM <- renderValueBox(
+#         valueBox(
+#           value   = paste0(splitRightsLM()),
+#           caption = "Priority date",
+#           color   = "success"
+#           )
+#         )
+```
+
+<!-- ### **Priority date** -->
+<!-- ```{r} -->
+<!-- valueBoxOutput("splitBoxLM") -->
+<!-- ``` -->
+
+```{r context = "server"}
+futureModelSummaryData <- eventReactive(input$submitButton2, {
+   # if(!is.null(input$districtMapFuture_click)) {
+    click <- input$districtMapFuture_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                 # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                      year          = as.factor(year),
+                      admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+
+                # ---- Join indicators & impacts data, summarize to district level ----
+                by_district <- left_join(
+                      ws_data,
+                      dplyr::select(short_year, year = wyear, district, 20:41),
+                      by = c("district", "year")
+                ) %>%
+                  # filter(district == 6) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T),
+                        af_total            = mean(af_total, na.rm = T),
+                        swe_max             = mean(swe_max, na.rm = T),
+                        prcp                = mean(prcp, na.rm = T),
+                        prcp_norm           = mean(prcp_norm, na.rm = T),
+                        pdsi                = mean(pdsi, na.rm = T),
+                        pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                        eddi1               = mean(eddi1, na.rm = T),
+                        eddi3               = mean(eddi3, na.rm = T),
+                        eddi6               = mean(eddi6, na.rm = T),
+                        eddi12              = mean(eddi12, na.rm = T),
+                        spi1                = mean(spi1, na.rm = T),
+                        spi3                = mean(spi3, na.rm = T),
+                        spi6                = mean(spi6, na.rm = T),
+                        spi9                = mean(spi9, na.rm = T),
+                        spi12               = mean(spi12, na.rm = T),
+                        tavg                = mean(tavg, na.rm = T),
+                        aet                 = mean(aet, na.rm = T),
+                        pet                 = mean(pet, na.rm = T),
+                        soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year)
+                  )
+                # ---- log transform data ----
+                trans_log <- by_district %>%
+                      mutate(
+                        short               = log10(short),
+                        short_dir           = log10(short_dir),
+                        short_norm          = log10(short_norm),
+                        short_dir_norm      = log10(short_dir_norm),
+                        aug_supply          = log10(aug_supply),
+                        aug_supply_norm     = log10(aug_supply_norm),
+                        supply              = log10(supply),
+                        supply_dir          = log10(supply_dir),
+                        demand              = log10(demand)
+                      )
+
+                  # replace Infinite w/ 0
+                is.na(trans_log) <- sapply(trans_log, is.infinite)
+                trans_log[is.na(trans_log)] <- 0
+
+                trans_log <- trans_log %>%
+                      # dplyr::select(short_dir_norm, prcp)
+                      dplyr::select(futureDepVar(), futureClimVar())
+
+                    # ---- Linear regression run, nested dataframe ----
+                lm_run <- trans_log %>%
+                        group_by(district) %>%
+                        nest(-district) %>%
+                        mutate(
+                          fit       = map(data,
+                                           # ~lm(short_dir_norm~prcp, data = .)),
+                                           ~lm(as.formula(
+                                             paste(futureDepVar()," ~ ", futureClimVar())
+                                           ),
+                                           data = .)),
+                          results   = map(fit, augment),
+                          tidied    = map(fit, tidy),
+                          metrics   = map(fit, glance)
+                        )
+
+                 indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("^", futureClimVar(), "$"), clim_model_indicator_lst)])
+                 impact_label <- names(impacts_lst[grep(pattern = paste0("^", futureDepVar(), "$"), impacts_lst)])
+                 # indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("prcp"), clim_model_indicator_lst)])
+                 # impact_label <- names(impacts_lst[grep(pattern = paste0("short_dir_norm"), impacts_lst)])
+      
+                 tbl_data <- lm_run %>%
+                        unnest(c(metrics)) %>%
+                        dplyr::select(district, tidied, r_squared = r.squared, p_value = p.value) %>%
+                        unnest(c(tidied))  %>%
+                        ungroup() %>%
+                        dplyr::select(term, coefficient = estimate, r_squared, p_value) %>%
+                        mutate(
+                            coefficient   = round(coefficient, 3),
+                            r_squared     = round(r_squared,3),
+                            p_value       = round(p_value, 5)
+                               ) %>%
+                        # mutate(across(where(is.numeric), round, 3)) %>%
+                        # mutate(across(where(is.numeric), as.character)) %>%
+                        rename(
+                            # District      = district,
+                            Term          = term,
+                            Coefficient   = coefficient,
+                            "R Squared"   = r_squared,
+                            "p-value"     = p_value
+                        )
+                  tbl_coeff <- tbl_data %>% 
+                        filter(Term != "(Intercept)") %>% 
+                        mutate(
+                           Term = indicator_label
+                           )
+                   
+                  tbl_int <- tbl_data %>% 
+                        filter(Term == "(Intercept)") 
+  
+                  tbl_clean <- bind_rows(tbl_int, tbl_coeff)
+                   
+                  customGreen0 = "#DeF7E9"
+                  customGreen = "#71CA97"
+                  customRed = "#ff7f7f"
+                  improvement_formatter <-
+                        formatter("span",
+                                  style = x ~ style(
+                                    font.weight = "bold",
+                                    color = ifelse(x > 0, customGreen, ifelse(x < 0, customRed, "black"))
+                                    )
+                                  )
+                  format_tbl <-
+                    formattable(tbl_clean,
+                                align = c("l",rep("r", NCOL(tbl_data) - 1)),
+                                list(
+                                  `Term` = formatter("span", style = ~ style(color = "black", font.weight = "bold")),
+                                  `Coefficient` = improvement_formatter,
+                                  area(col = 3:4) ~ color_tile("#EAECEE", "#EAECEE"))
+                                )
+                  format_tbl
+}})
+
+output$futureModelSummary <- renderFormattable({
+                  futureModelSummaryData()
+                  })
+```
+
+### Model summary {data-height=75}
+```{r}
+formattable::formattableOutput("futureModelSummary")
+```
+
+Column {data-width=550}
+-------------------------------------
+### Timeseries
+```{r}
+highcharter::highchartOutput("climateTimeseries")
+```
+
+```{r context = "server"}
+projectedClimateData <- eventReactive(input$submitButton2, {
+   # if(!is.null(input$districtMapFuture_click)) {
+      click <- input$districtMapFuture_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                 # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                      year          = as.factor(year),
+                      admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+#                 
+#                 # ---- Join indicators & impacts data, summarize to district level ----
+                by_district <- left_join(
+                        ws_data,
+                        dplyr::select(short_year, year = wyear, district, 20:41),
+                        by = c("district", "year")
+                        ) %>%
+                  # filter(district == 8) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T),
+                        af_total            = mean(af_total, na.rm = T),
+                        swe_max             = mean(swe_max, na.rm = T),
+                        prcp                = mean(prcp, na.rm = T),
+                        prcp_norm           = mean(prcp_norm, na.rm = T),
+                        pdsi                = mean(pdsi, na.rm = T),
+                        pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                        eddi1               = mean(eddi1, na.rm = T),
+                        eddi3               = mean(eddi3, na.rm = T),
+                        eddi6               = mean(eddi6, na.rm = T),
+                        eddi12              = mean(eddi12, na.rm = T),
+                        spi1                = mean(spi1, na.rm = T),
+                        spi3                = mean(spi3, na.rm = T),
+                        spi6                = mean(spi6, na.rm = T),
+                        spi9                = mean(spi9, na.rm = T),
+                        spi12               = mean(spi12, na.rm = T),
+                        tavg                = mean(tavg, na.rm = T),
+                        aet                 = mean(aet, na.rm = T),
+                        pet                 = mean(pet, na.rm = T),
+                        soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year))
+              
+
+                trans_log <- by_district %>%
+                      mutate(
+                        short               = log10(short),
+                        short_dir           = log10(short_dir),
+                        short_norm          = log10(short_norm),
+                        short_dir_norm      = log10(short_dir_norm),
+                        aug_supply          = log10(aug_supply),
+                        aug_supply_norm     = log10(aug_supply_norm),
+                        supply              = log10(supply),
+                        supply_dir          = log10(supply_dir),
+                        demand              = log10(demand),
+                        af_total            = log10(af_total)
+                      ) %>%
+                  ungroup() %>%
+                  group_by(district)
+                
+                #     
+                    # replace Infinite w/ 0
+                  is.na(trans_log) <- sapply(trans_log, is.infinite)
+                  trans_log[is.na(trans_log)] <- 0
+
+                  trans_log <- trans_log %>%
+                      # dplyr::select(short_dir_norm, prcp)
+                      dplyr::select(futureDepVar(), futureClimVar())
+                  
+                  
+                  lm_run <- trans_log %>%
+                        group_by(district) %>%
+                        nest(-district) %>%
+                        mutate(
+                          fit       = map(data,
+                                           # ~lm(short_dir_norm~prcp, data = .)),
+                                           ~lm(as.formula(
+                                             paste0(futureDepVar()," ~ ", futureClimVar())
+                                           ),
+                                           data = .)),
+                          # results   = map(fit, augment),
+                          # tidied    = map(fit, tidy),
+                          # metrics   = map(fit, glance)
+                        ) %>% 
+                        unnest(c(2)) %>%
+                        # dplyr::select(district, short_dir_norm, prcp, fit) %>%
+                        dplyr::select(district, futureDepVar(), futureClimVar(), fit) %>%
+                        setNames(c("district", "dependent", "independent", "model"))
+                  
+                  lm_fit <- lm_run$model[[1]]
+                  
+                  climate_proj <- climate_models %>% 
+                    # filter(dataset == "MACA", district == 8, year >1950) %>%
+                    # dplyr::select(year, prcp)
+                    filter(dataset == climModel(), district == district_id$district, year >1950) %>%
+                    dplyr::select(year, futureClimVar()) %>% 
+                    mutate(across(where(is.numeric), round, 2))
+                    # setNames(c("year", "climate_var"))
+                  
+            
+                  pred_future <- predict(lm_fit, dplyr::select(climate_proj,  futureClimVar()))
+                  # pred_future <- predict(lm_fit, dplyr::select(climate_proj, prcp))
+                  pred_df <- data.frame(year = 1951:2099, fitted = pred_future)
+                   # pred_df <- left_join(pred_df, dplyr::select(future_data, -district), by = "year")
+                   
+                  pred_df <- pred_df %>%
+                    ungroup() %>%
+                    mutate(
+                      prediction          = 10^fitted
+                    ) %>% 
+                    mutate(across(where(is.numeric), round, 1))
+
+                    
+                  indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("^", futureClimVar(), "$"), clim_model_indicator_lst)])
+                  impact_label <- names(impacts_lst[grep(pattern = paste0("^", futureDepVar(), "$"), impacts_lst)])
+                    # indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("prcp"), clim_model_indicator_lst)])
+                    # impact_label <- names(impacts_lst[grep(pattern = paste0("short_dir_norm"), impacts_lst)])
+                    
+                    lm_hc <- 
+                      highchart() %>%
+                            hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+                                           scatter = list(marker = list(symbol = "circle"))) %>%
+                            hc_yAxis_multiples(
+                              list(title = list(
+                                text = indicator_label,
+                                style  = list(fontWeight = "bold",  fontSize = '1.2em')),
+                                labels = list(style = list(fontSize =  '1.2em')),
+                                top      = "0%",
+                                height = "50%",
+                                opposite = TRUE),
+                              list(title = list(
+                                text  = impact_label,
+                                style = list(fontWeight = "bold",  fontSize = '1.2em')
+                              ),
+                              labels = list(style = list(fontSize =  '1.2em')),
+                                top = "50%",
+                                height = "50%"
+                              )
+                            ) %>%
+                          # hc_yAxis_multiples(
+                          #     list(title = list(text = indicator_label, style = list(fontWeight = "bold",  fontSize = '1.2em')),
+                          #          labels = list(style = list(fontSize =  '1.2em')),
+                          #          min = 0, max = max(climate_proj$prcp), opposite = TRUE),
+                          #     list(title = list(text = impact_label,
+                          #                       style = list(fontWeight = "bold", fontSize = '1.2em'),
+                          #                       labels = list(style = list(fontSize =  '1.2em')),
+                          #                       min = 0, max =  max(pred_df$prediction)))) %>%
+                            hc_xAxis(
+                              title = list(text = "Year", style = list(fontWeight = "bold",fontSize = '1.2em'
+                              )), 
+                              labels = list(style = list(fontSize =  '1.2em'))
+                            ) %>%
+                            hc_add_series(
+                              data = dplyr::arrange(climate_proj, year),
+                              type = 'line', name = indicator_label,
+                              # hcaes(x = year, y =  prcp),
+                              hcaes(x = year, y =  !!futureClimVar()),
+                              yAxis = 0,fillOpacity = 0.5) %>%
+                            hc_add_series(
+                              data = dplyr::arrange(pred_df, year),
+                              type = 'column', name = impact_label,
+                              # hcaes(x = Independent, y = Dependent),
+                              hcaes(x = year, y =  prediction),
+                              yAxis = 1, fillOpacity = 0.5) %>% 
+                            # hc_add_series(
+                            #   data = dplyr::arrange(pred_df, year),
+                            #   type = 'column', name = impact_label,
+                            #   # hcaes(x = Independent, y = Dependent),
+                            #   hcaes(x = year, y =  prediction),
+                            #   yAxis = 1, fillOpacity = 0.5) %>% 
+                            # hc_add_series(
+                            #   data = dplyr::arrange(climate_proj, year),
+                            #   type = 'line', name = indicator_label,
+                            #   hcaes(x = year, y =  prcp),
+                            #   # hcaes(x = year, y =  !!futureClimVar()),
+                            #   yAxis = 0,fillOpacity = 0.5) %>%
+                            hc_colors(c("#91BEEA", "#EE8E8C", "#34495E")) %>% # "#5D6D7E"
+                            hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                    lm_hc
+             }
+})
+
+output$climateTimeseries <- renderHighchart({
+  projectedClimateData()
+})
+```
+
+### Predicted Impacts 
+```{r}
+# plotly::plotlyOutput("wsTimeseries")
+# highcharter::highchartOutput("lmPlot")
+highcharter::highchartOutput("predictionPlot")
+# verbatimTextOutput("lmPlot")
+```
+
+```{r context = "server"}
+predictImpactsData <- eventReactive(input$submitButton2, {
+   # if(!is.null(input$districtMapFuture_click)) {
+      click <- input$districtMapFuture_click %>%
+            data.frame() %>%
+            dplyr::select(lat,lng)
+
+          pt <- sf::st_as_sf(
+            click,
+            coords = c("lng", "lat"),
+            crs = 4326
+            )
+          # point intersection w/ polygons
+          pt_intersect <-  st_filter(shp, pt)
+
+          # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+          if(nrow(pt_intersect) == 0) {
+              NULL
+             } else {
+                district_id <- pt_intersect %>%
+                    rename(district = DISTRICT) %>%
+                    mutate(district = as.numeric(district))
+                 # ---- Water supply data summarized to the year ----
+                ws_data <- by_admin %>%
+                  group_by(year, district) %>%
+                  mutate(
+                      year          = as.factor(year),
+                      admin_number  = as.integer(round(admin, 0))
+                  ) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                      short               = sum(short, na.rm = T),
+                      short_dir           = sum(short_dir, na.rm = T),
+                      demand              = sum(demand, na.rm = T),
+                      supply              = sum(supply, na.rm = T),
+                      supply_dir          = sum(supply_dir, na.rm = T)
+                  ) %>%
+                  mutate(
+                      short_norm          = 100*(round(short/demand, 3)),
+                      short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                      aug_supply          = round((supply - supply_dir), 3),
+                      aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                      year                = as.factor(year)
+                  )
+              
+                # ---- Join indicators & impacts data, summarize to district level ----
+                by_district <- left_join(
+                        ws_data,
+                        dplyr::select(short_year, year = wyear, district, 20:41),
+                        by = c("district", "year")
+                        ) %>%
+                  # filter(district == 1) %>%
+                  filter(district == district_id$district) %>%
+                  dplyr::filter(!year %in% c(1980, 2013)) %>%
+                  group_by(basin, district, year) %>%
+                  summarise(
+                        short               = sum(short, na.rm = T),
+                        short_dir           = sum(short_dir, na.rm = T),
+                        demand              = sum(demand, na.rm = T),
+                        supply              = sum(supply, na.rm = T),
+                        supply_dir          = sum(supply_dir, na.rm = T),
+                        af_total            = mean(af_total, na.rm = T),
+                        swe_max             = mean(swe_max, na.rm = T),
+                        prcp                = mean(prcp, na.rm = T),
+                        prcp_norm           = mean(prcp_norm, na.rm = T),
+                        pdsi                = mean(pdsi, na.rm = T),
+                        pdsi_gridmet        = mean(pdsi_gridmet, na.rm = T),
+                        eddi1               = mean(eddi1, na.rm = T),
+                        eddi3               = mean(eddi3, na.rm = T),
+                        eddi6               = mean(eddi6, na.rm = T),
+                        eddi12              = mean(eddi12, na.rm = T),
+                        spi1                = mean(spi1, na.rm = T),
+                        spi3                = mean(spi3, na.rm = T),
+                        spi6                = mean(spi6, na.rm = T),
+                        spi9                = mean(spi9, na.rm = T),
+                        spi12               = mean(spi12, na.rm = T),
+                        tavg                = mean(tavg, na.rm = T),
+                        aet                 = mean(aet, na.rm = T),
+                        pet                 = mean(pet, na.rm = T),
+                        soilm               = mean(soilm, na.rm = T)
+                  ) %>%
+                  mutate(
+                        short_norm          = 100*(round(short/demand, 3)),
+                        short_dir_norm      = 100*(round(short_dir/demand, 3)),
+                        aug_supply          = round((supply - supply_dir), 3),
+                        aug_supply_norm     = round(100*(aug_supply/supply), 3),
+                        year                = as.factor(year))
+              
+
+                trans_log <- by_district %>%
+                      mutate(
+                        short               = log10(short),
+                        short_dir           = log10(short_dir),
+                        short_norm          = log10(short_norm),
+                        short_dir_norm      = log10(short_dir_norm),
+                        aug_supply          = log10(aug_supply),
+                        aug_supply_norm     = log10(aug_supply_norm),
+                        supply              = log10(supply),
+                        supply_dir          = log10(supply_dir),
+                        demand              = log10(demand),
+                        af_total            = log10(af_total)
+                      ) %>%
+                  ungroup() %>%
+                  group_by(district)
+                  
+                  # ---- replace Infinite w/ 0 ----
+                  is.na(trans_log) <- sapply(trans_log, is.infinite)
+                  trans_log[is.na(trans_log)] <- 0
+
+                  trans_log <- trans_log %>%
+                      # dplyr::select(af_total, aet)
+                      dplyr::select(futureDepVar(), futureClimVar())
+                      
+                  
+                  lm_run <- trans_log %>%
+                        group_by(district) %>%
+                        nest(-district) %>%
+                        mutate(
+                          fit       = map(data,
+                                           # ~lm(af_total~aet, data = .)),
+                                           ~lm(as.formula(
+                                             paste0(futureDepVar()," ~ ", futureClimVar())
+                                           ),
+                                           data = .)),
+                          results   = map(fit, augment),
+                          tidied    = map(fit, tidy),
+                          metrics   = map(fit, glance)
+                        ) %>% 
+                        unnest(c(4)) 
+                  
+                  lm_fit <- lm_run$fit[[1]]
+                  
+                  lm_run2 <- lm_run %>% 
+                    # dplyr::select(district, af_total, aet, Fitted = .fitted) %>%
+                    dplyr::select(district, futureDepVar(), futureClimVar(), Fitted = .fitted) %>%
+                    setNames(c("district", "dependent_historic", "independent_historic", "fit_historic"))
+                   
+                    # # Extract fitted values and back transform Logs
+                    # mod_vals <- lm_run2 %>%
+                    #     ungroup() %>%
+                    #     mutate(
+                    #         dependent_historic          = 10^lm_run2$dependent_historic,
+                    #         fit_historic                = 10^lm_run2$fit_historic
+                    #     ) %>%
+                    #     mutate(across(where(is.numeric), round, 1))
+
+                    density_vals_hist <- density(lm_run2$independent_historic)
+                    density_yaxis_hist <- density_vals_hist$y
+                    
+                   future_data <- climate_models %>%
+                      filter(dataset == climModel(), district == district_id$district, year > 1950) %>%
+                      dplyr::select(district, year, futureClimVar())
+                        # filter(dataset == "MACA", district == 1, year >1950) %>%
+                        # dplyr::select(district, year, aet)
+                   
+                
+                   # pred_future <- predict(lm_fit, dplyr::select(future_data, aet))
+                   pred_future <- predict(lm_fit, dplyr::select(future_data,  futureClimVar()))
+                   pred_df <- data.frame(year = 1951:2099, fitted = pred_future)
+                   pred_df <- left_join(pred_df, dplyr::select(future_data, -district), by = "year")
+                   
+                  pred_df <- pred_df %>%
+                    ungroup() %>%
+                    mutate(
+                      prediction          = 10^fitted
+                    ) %>% 
+                    setNames(c("year", "fitted", "independent_future", "prediction")) %>% 
+                    mutate(across(where(is.numeric), round, 3))
+                  
+                  density_vals_future <- density(pred_df$independent_future)
+                  density_yaxis_future <- density_vals_future$y
+
+                  indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("^", futureClimVar(), "$"), clim_model_indicator_lst)])
+                  impact_label <- names(impacts_lst[grep(pattern = paste0("^", futureDepVar(), "$"), impacts_lst)])
+                    # indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("aet"), clim_model_indicator_lst)])
+                    # impact_label <- names(impacts_lst[grep(pattern = paste0("short_dir_norm"), impacts_lst)])
+                    
+                  lm_hc <- 
+                      highchart() %>%
+                          hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+                                         scatter = list(marker = list(symbol = "circle"))) %>%
+                          hc_yAxis_multiples(
+                              list(title = list(text = "", style = list(fontWeight = "bold",  fontSize = '1.2em')),
+                                   labels = list(style = list(fontSize =  '1.2em')),
+                                   min = 0, max = pmax(max(density_yaxis_future), max(density_yaxis_hist)), opposite = TRUE),
+                              list(title = list(text = impact_label,
+                                                style = list(fontWeight = "bold", fontSize = '1.2em'),
+                                                labels = list(style = list(fontSize =  '1.2em')),
+                                                min = 0, max = max(pred_df$prediction)))) %>%
+                          hc_xAxis(
+                            title = list(
+                              text = indicator_label,
+                              style = list(
+                                fontWeight = "bold",
+                                fontSize = '1.2em')),
+                            labels = list(style = list(fontSize =  '1.2em'))) %>%
+                          hc_add_series(
+                            data = density(pred_df$independent_future),
+                            type = 'area',
+                            # name = "Projected climate variable distribution",
+                            name = paste0(indicator_label, " projected distribution"),
+                            yAxis = 0, fillOpacity = 0.7) %>%
+                          hc_add_series(
+                            data = density(lm_run2$independent_historic),
+                            type = 'area',
+                            # name = "Historic climate variable distribution",
+                            name = paste0(indicator_label, " historic distribution"),
+                            yAxis = 0, fillOpacity = 0.7) %>%
+                          hc_add_series(
+                            data = dplyr::arrange(pred_df, independent_future),
+                            type = 'line', name = impact_label,
+                            hcaes(x = independent_future, y =  prediction),
+                            yAxis = 1, fillOpacity = 0.5) %>% 
+                          hc_colors(c("#91BEEA", "#EE8E8C", "black")) %>% # "#5D6D7E"
+                          hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+                  
+                  lm_hc
+             }
+})
+
+output$predictionPlot <- renderHighchart({
+  predictImpactsData()
+})
+```
+
+

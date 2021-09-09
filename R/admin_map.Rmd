@@ -1,0 +1,332 @@
+---
+title: "CPO"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    css: www/custom.css
+    navbar:
+      - { icon: "fa-question-circle", href: "https://github.com/anguswg-ucsb/drought_data_processing", align: right }
+    theme: cerulean
+    orientation: columns
+    source_code: embed
+    vertical_layout: fill
+---
+
+```{r setup, include = FALSE}
+# Shiny & Flexdashboard libraries
+library(shiny)
+library(flexdashboard)
+
+# Data libraries
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(leaflet)
+library(sf)
+library(tools)
+library(highcharter)
+library(viridis)
+
+source('data_utils.R')
+```
+
+
+```{r context="server"}
+# districts for analysis
+distr_num <- c(1,  2,  4,  5,  6,  7,  8,  9,  23, 64, 80,
+               36, 37, # 38, 
+               39, 45, 50, 51, 52, 53, 70, 72)
+
+# district shapefile path
+shp_path = "water_districts_simple.geojson"
+
+ # load shapefiles as spatial polygon object
+shp <- sf::read_sf(paste0(shp_path), quiet = TRUE) %>%
+  filter(DISTRICT %in% distr_num) %>%
+  st_transform(4326) %>% 
+  st_cast("MULTIPOLYGON")
+
+# Tidied MLR results by district
+tidy_mlr <- readRDS("tidy_mlr.rds")
+
+shp <- left_join(shp, tidy_mlr, by = c("DISTRICT" = "district"))
+
+node_pts <- readRDS("node_pts.rds")
+
+# ditch_data <- readRDS("ditch_data.rds")
+ditch_data <- readRDS("ditch_data2.rds")
+
+#Initialize Maps 
+output$districtMap     <- renderLeaflet({ mlr_map(shp = shp) })
+output$nodeMap         <- renderLeaflet({ basemap(shp = shp) })
+```
+
+Water ditches
+=======================================
+Column {data-width=450}
+-----------------------------------------------------------------------
+### Nodes
+```{r}
+leafletOutput("nodeMap")
+```
+
+```{r context="server"}
+# render district value box at start
+# output$districtBoxNode <- renderValueBox(
+#                     valueBox(
+#                       value = "District", 
+#                       color = "success"
+#                   )
+#                 )
+
+# Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
+observeEvent(input$districtMap_click, {
+   if(!is.null(input$districtMap_click)) {
+      click <- input$districtMap_click %>%
+        data.frame() %>%
+        dplyr::select(lat,lng)
+      print(click)
+
+      pt <- sf::st_as_sf(
+        click,
+        coords = c("lng", "lat"),
+        crs = 4326
+        )
+
+      # point intersection w/ polygons
+      pt_intersect <-  st_filter(shp, pt)
+
+      # ensure  app will not crash if a somewhere other than a shape is clicked and returns no results from point-shape intersection
+       if(nrow(pt_intersect) == 0) {
+          NULL
+       } else {
+          district_id <- pt_intersect %>%
+              rename(district = DISTRICT) %>%
+              mutate(district = as.numeric(district))
+
+          # District number value box
+          # output$districtBoxNode <- renderValueBox(
+          #   valueBox(
+          #     value = paste0("District ", district_id$district),
+          #     color = "success"
+          #     )
+          #   )
+          pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
+          # bb = shp %>%
+          #     st_bbox() %>%
+          #     st_as_sfc() %>%
+          #     st_transform(4326) %>%
+          #     st_as_sf()
+          # # Map 2 fly to bounds
+          # bounds <- st_bbox(bb) %>%
+          #     st_as_sfc() %>%
+          #     st_buffer(0.009) %>%
+          #     st_bbox() %>%
+          #     as.vector()
+       
+          leafletProxy("districtMap") %>%
+              clearMarkers() %>%
+              clearShapes() %>%
+              addMarkers(data = pt) %>%
+              addPolygons(
+                    data = shp,
+                    color = "black",
+                    fillOpacity = 0.8,
+                    fillColor = ~pal(variance_rsq),
+                    weight = 2,
+                    label = ~DISTRICT,
+                    labelOptions = labelOptions(
+                      noHide = F,
+                      # direction = 'center',
+                      # textOnly = F)
+                      style = list(
+                        "color" = "black",
+                        "font-weight" = "1000")
+                  )
+                ) 
+          bb = shp %>%
+              # filter(DISTRICT == 6) %>% 
+              filter(DISTRICT == district_id$district) %>% 
+              st_bbox() %>%
+              st_as_sfc() %>%
+              st_transform(4326) %>%
+              st_as_sf()
+          
+          # Fly to bounds on Node map
+          bounds <- st_bbox(bb) %>%
+              st_as_sfc() %>%
+              # st_buffer(0.009) %>%
+              st_bbox() %>%
+              as.vector()
+          
+          node_marker <- node_pts %>%
+            # filter(district == 6)
+            filter(district == district_id$district)
+          
+          leafletProxy("nodeMap") %>%
+                clearMarkers() %>%
+                clearShapes() %>%
+                addPolygons(
+                      data = filter(shp, DISTRICT == district_id$district),
+                      fillColor = 'white',
+                      fillOpacity = 0.4,
+                      col = "black",
+                      weight = 2,
+                      label = ~DISTRICT,
+                      labelOptions = labelOptions(
+                          noHide = F,
+                          # direction = 'center',
+                          # textOnly = F)
+                          style = list(
+                            "color" = "black",
+                            "font-weight" = "1000")
+                    )
+                  ) %>% 
+                 addCircleMarkers(
+                      data = node_marker,
+                      radius = 7,
+                        color = "black",
+                        fillColor ="red",
+                        fillOpacity = 0.7,
+                        weight = 3,
+                      layerId = ~node_id,
+                    
+                        stroke = TRUE) %>% 
+            flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
+      
+          # output$nodeText <- renderText({
+          #   paste0(node_marker)
+          # })
+ 
+       }
+      }
+  })
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+### Water districts
+```{r}
+leafletOutput("districtMap")
+```
+
+### Admin shortages
+```{r}
+highcharter::highchartOutput("adminShortagePlot")
+```
+```{r context="server"}
+observeEvent(input$nodeMap_marker_click, {
+    node <<- input$nodeMap_marker_click$id
+    # ---- Node timeseries ----
+    # filter data to node
+    # ditch <- ditch_data %>%
+    #   filter(node_id == node) %>%
+    #   group_by(year, admin) %>%
+    #   summarize(across(c(19:24), sum)) %>% 
+    #   ungroup()
+    
+    # split node by admin
+    node_split_short <- ditch_data %>% 
+      filter(node_id == node) %>%
+      # filter(node_id == "0700699") %>%
+      mutate(admin = round(as.numeric(admin), 0)) %>% 
+      group_by(admin) %>% 
+      mutate(x = year, y = round(short_dir, 1)) %>% 
+      dplyr::select(x, y, admin) %>% 
+      group_split() %>% 
+      as.list()
+    
+    # initialize highchart
+    admin_short_hc <- highchart() %>% 
+       hc_plotOptions(
+                # series = list(label = list(enabled = FALSE)),
+                line = list(marker = list(enabled = FALSE, symbol = "circle"), label = list(enabled = FALSE), lineWidth = 4),
+                area = list(stacking = 'normal', label = list(enabled = FALSE)),
+                column = list(stacking = 'normal', label = list(enabled = FALSE)),
+                bar = list(stacking = 'normal', label = list(enabled = FALSE))
+            ) %>%
+        hc_title(text = "Shortages") %>% 
+        hc_colors(viridis::cividis(n = length(node_split_short))) %>%
+        hc_xAxis(categories = node_split_short[[1]][1],
+                 labels = list(style = list(fontSize =  '1.1em'))) %>% 
+        hc_yAxis(title = list(
+                            text =  "Direct flow shortage (acre feet)",
+                            style = list(fontWeight = "bold",  fontSize = '1.2em')),
+                 labels = list(style = list(fontSize =  '1.1em'))) %>%  
+        hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+    
+    # for loop to generate highcharter series for each admin number
+    for (i in 1:length(node_split_short)) {
+      admin_short_hc <- admin_short_hc %>%
+          hc_add_series(node_split_short[[i]], name = paste0(node_split_short[[i]][1,3]), type = "area", fillOpacity = 1)
+      }
+      
+    output$adminShortagePlot <- renderHighchart({
+       admin_short_hc
+      })
+})
+```
+
+### Admin demand
+```{r}
+highcharter::highchartOutput("adminDemandPlot")
+```
+
+```{r context="server"}
+observeEvent(input$nodeMap_marker_click, {
+    node <<- input$nodeMap_marker_click$id
+    
+    node_split_demand <- ditch_data %>% 
+      filter(node_id == node) %>%
+      # filter(node_id == "0700699") %>%
+      mutate(admin = round(as.numeric(admin), 0)) %>% 
+      group_by(admin) %>% 
+      mutate(x = year, y = round(demand_dir, 1)) %>% 
+      dplyr::select(x, y, admin) %>% 
+      group_split() %>% 
+      as.list()
+    
+    # initialize highchart
+    admin_dem_hc <- highchart() %>%
+      highchart() %>% 
+          hc_plotOptions(
+              # series = list(label = list(enabled = FALSE)),
+              line = list(marker = list(enabled = FALSE, symbol = "circle"), label = list(enabled = FALSE), lineWidth = 4),
+              area = list(stacking = 'normal', label = list(enabled = FALSE)),
+              column = list(stacking = 'normal', label = list(enabled = FALSE)),
+              bar = list(stacking = 'normal', label = list(enabled = FALSE))
+          ) %>%
+          hc_title(text = "Demand") %>% 
+          hc_colors(viridis::cividis(n = length(node_split_demand))) %>%
+          hc_xAxis(categories = node_split_demand[[1]][1],
+                   labels = list(style = list(fontSize =  '1.1em'))) %>% 
+          hc_yAxis(title = list(
+                              text =  "Demand (acre feet)",
+                              style = list(fontWeight = "bold",  fontSize = '1.2em')),
+                   labels = list(style = list(fontSize =  '1.1em'))) %>%  
+          hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+  
+    
+    # for loop to generate highcharter series for each admin number
+    for (i in 1:length(node_split_demand)) {
+      admin_dem_hc <- admin_dem_hc %>%
+        hc_add_series(node_split_demand[[i]], name = paste0(node_split_demand[[i]][1,3]), type = "area", fillOpacity = 0.7)
+      }
+    
+      
+    output$adminDemandPlot <- renderHighchart({
+       admin_dem_hc
+      })
+})
+```
+
+
+
+
+
+
+
+
+
+
+

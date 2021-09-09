@@ -14,9 +14,9 @@ basemap <- function(shp, pts = NULL) {
           addPolygons(
               data = shp,
               fillColor = 'white',
-              fillOpacity = 0.4,
+              fillOpacity = 0.5,
               col = "black",
-              weight = 2,
+              weight = 3,
               label = ~DISTRICT,
               labelOptions = labelOptions(
                   noHide = F,
@@ -81,7 +81,7 @@ mlr_map <- function(shp, pts = NULL) {
           activeColor = "red",
           completedColor = "green" ) %>%
         leafem::addMouseCoordinates() %>%
-        leaflet::setView(lng = -105.5, lat = 39.5, zoom = 7)
+        leaflet::setView(lng = -105.5, lat = 39.5, zoom = 6)
 }
 coeff_map <- function(shp, pts) {
     pal <- colorNumeric("viridis", domain = pts$af_total, n = 10)

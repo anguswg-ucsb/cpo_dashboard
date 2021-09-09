@@ -64,7 +64,29 @@ names(tmp) <- names(rename_all(by_district, recode,
                                pet               = "Potential Evapotranspiration",
                                soilm             = "Soil moisture")
 )
-
+names(impacts_lst)
+names(indicator_lst[grep(pattern = "prcp", indicator_lst)])
+names(impacts_lst[grep(pattern = paste0("^", "short_dir", "$"), impacts_lst)])
+# Fix names for axis, labels, titles
+pred_names <- names(rename_all(ws_predictors, recode,
+                               swe_max           = "SWE maximum",
+                               prcp              = "Precipitation",
+                               pdsi              = "PDSI",
+                               pdsi_gridmet      = "PDSI (gridMET)",
+                               eddi1             = "EDDI 1 month",
+                               eddi3             = "EDDI 3 month",
+                               eddi6             = "EDDI 6 month",
+                               eddi12            = "EDDI 12 month",
+                               spi1              = "SPI 1 month",
+                               spi3              = "SPI 3 month",
+                               spi6              = "SPI 6 month",
+                               spi9              = "SPI 9 month",
+                               spi12             = "SPI 12 month",
+                               tavg              = "Average temperature (C)",
+                               aet               = "Actual evapotranspiration",
+                               pet               = "Potential Evapotranspiration",
+                               soilm             = "Soil moisture")
+)
 indicator_lst <- list("Precipitation" = "prcp",
   "SWE maximum" = "swe_max",
   "Average temperature" = "tavg",
