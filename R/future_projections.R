@@ -2,6 +2,87 @@
 co_indicators <- readRDS("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/future_climate/maca/colorado/monthly/drought_indicators_maca_rcp45_co.rds")
 sp_indicators <- readRDS("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/future_climate/maca/south_platte/monthly/drought_indicators_maca_rcp45_sp.rds")
 
+
+# --- ADJUST TIMESERIES ----
+highchart() %>%
+  hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+                 scatter = list(marker = list(symbol = "circle"))) %>%
+  hc_yAxis_multiples(
+    list(title = list(
+      text = indicator_label,
+      style  = list(fontWeight = "bold",  fontSize = '1.2em')),
+      labels = list(style = list(fontSize =  '1.2em')),
+      top      = "0%",
+      height = "50%",
+      opposite = TRUE),
+    list(title = list(
+      text  = impact_label,
+      style = list(fontWeight = "bold",  fontSize = '1.2em')
+    ),
+    labels = list(style = list(fontSize =  '1.2em')),
+    top = "50%",
+    height = "50%"
+    )
+  ) %>%
+  hc_xAxis(
+    title = list(text = "Year", style = list(fontWeight = "bold",fontSize = '1.2em'
+    )),
+    labels = list(style = list(fontSize =  '1.2em')),
+    plotBands = list(
+      list(from =2013, to =2099, color = "rgba(0, 100, 0, 0.1)",
+           label = list(text = "Historical record", style = list( color = "black", fontWeight = 'bold' )
+                        )))
+  ) %>%
+  hc_add_series(
+    data = dplyr::arrange(indicator_ts, year),
+    type = 'line', name = indicator_label,
+    hcaes(x = year, y =  prcp),
+    # hcaes(x = year, y =  !!futureClimVar()),
+    yAxis = 0,fillOpacity = 0.5) %>%
+  hc_add_series(
+    data = dplyr::arrange(impact_ts, year),
+    type = 'column', name = impact_label,
+    # hcaes(x = Independent, y = Dependent),
+    hcaes(x = year, y =  impact),
+    yAxis = 1, fillOpacity = 0.5)
+
+#  historic climate variable data
+indicator_historic <- by_district %>%
+  ungroup() %>%
+  dplyr::select(year, prcp) %>%
+  mutate(
+    year   = as.numeric(as.character(year)),
+         source = "historic"
+    )
+# modeled climate variable
+indicator_projected <- climate_proj %>%
+  filter(year >= 2013) %>%
+  mutate(source = "projected")
+
+# join historic climate variable data w/ modeled data
+indicator_ts <- bind_rows(indicator_historic, indicator_projected)
+
+# historic impacts
+impact_historic <- by_district %>%
+  ungroup() %>%
+  dplyr::select(year, short_dir_norm) %>%
+  mutate(
+    year   = as.numeric(as.character(year)),
+    source = "historic"
+  ) %>%
+  setNames(c("year", "impact", "source"))
+
+# predicted impacts
+impact_projected <- pred_df %>%
+  filter(year >= 2013) %>%
+  dplyr::select(year, prediction) %>%
+  mutate(source = "projected") %>%
+  setNames(c("year", "impact", "source"))
+
+# join historic impacts data w/ predicted impacts
+impact_ts <- bind_rows(impact_historic, impact_projected)
+
+
 clim <- bind_rows(co_indicators, sp_indicators)
 bcca <- readRDS("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/future_climate/bcca/monthly/drought_indicators_bcca_rcp45.rds") %>%
   na.omit()
@@ -212,12 +293,53 @@ highchart() %>%
     fillOpacity = 0.5) %>%
   hc_colors(c("#91BEEA", "#EE8E8C", "black")) %>% # "#5D6D7E"
   hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+highchart() %>%
+  hc_add_series(
+    data = c(29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1, 95.6, 54.4)
+  ) %>%
+  hc_xAxis(
+    tickInterval = 0.5,
+    gridLineWidth = 1
+  ) %>%
+  hc_annotations(
+    list(
+      labels =
+        list(
+          list(
+            point = list(x = 3, y = 129.2, xAxis = 0, yAxis = 0),
+            text = "x: {x}<br/>y: {y}"
+          ),
+          list(
+            point = list(x = 9, y = 194.1, xAxis = 0, yAxis = 0),
+            text = "x: {x}<br/>y: {y}"
+          ),
+          list(
+            point = list(x = 5, y = 100, xAxis = 0),
+            text = "x: {x}<br/>y: {point.plotY} px"
+          ),
+          list(
+            point = list(x = 0, y = 0),
+            text = "x: {point.plotX} px<br/>y: {point.plotY} px"
+          )
+        )
+    )
+  )
 
+n <- 10
+reps <- 10000
+
+# perform random sampling
+samples <- replicate(reps, rnorm(by_district$prcp)) # 10 x 10000 sample matrix
+
+# compute sample means
+sample.avgs <- colMeans(samples)
+hist(sample.avgs,
+     ylim = c(0, 10),
+     col = "steelblue" ,
+     freq = F,
+     breaks = 20)
 tmp <- pred_df %>% filter(year >1980, year<2013)
-plot(density(tmp$independent_future))
-plot(density(lm_run2$independent_historic))
-ggplot() +
-  geom_line(data = arrange(pred_df, year), aes(x = independent_future, y = prediction))
+
 highchart() %>%
   hc_plotOptions(line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
                  scatter = list(marker = list(symbol = "circle"))) %>%

@@ -5,12 +5,12 @@ basemap <- function(shp, pts = NULL) {
 
     leaflet() %>%
           addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
-          addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
-          addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
-          addLayersControl(
-            options = layersControlOptions(collapsed = FALSE),
-            baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
-          ) %>%
+          # addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+          # addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
+          # addLayersControl(
+          #   options = layersControlOptions(collapsed = FALSE),
+          #   baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
+          # ) %>%
           addPolygons(
               data = shp,
               fillColor = 'white',
@@ -42,12 +42,12 @@ mlr_map <- function(shp, pts = NULL) {
       # Leaflet map
       leaflet() %>%
         addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
-        addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
-        addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
-        addLayersControl(
-          options = layersControlOptions(collapsed = FALSE),
-          baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
-        ) %>%
+        # addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+        # addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
+        # addLayersControl(
+        #   options = layersControlOptions(collapsed = FALSE),
+        #   baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
+        # ) %>%
         addPolygons(
           data = shp,
           color = "black",

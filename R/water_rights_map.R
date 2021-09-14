@@ -1,4 +1,73 @@
 library(sf)
+
+# ---- NODE TABLE ----
+
+# node dataset w/ WDID column
+ditch_data <- ditch_data %>%
+  mutate(WDID = as.numeric(node_id))
+
+tmp_ditch <- ditch_data %>%
+  group_by(admin) %>%
+  slice(n = 1) %>%
+  ungroup() %>%
+  arrange(node_id)
+
+ditch_names <- readRDS("ditch_names.rds")
+ditch_names <- ditch_names %>%
+  group_by(admin) %>%
+  slice(n = 1) %>%
+  ungroup() %>%
+  arrange(node_id)
+
+ditch_all <- bind_cols(dplyr::select(tmp_ditch, node_id, admin, WDID), dplyr::select(ditch_names, name))
+saveRDS(ditch_all, "ditch_names2.rds")
+
+# base URL to CDSS website
+url <- "https://dwr.state.co.us/Tools/Structures/"
+
+# filter to specific WDID
+wdid <- ditch_data %>%
+  filter(node_id == 3600729) %>%
+  dplyr::select(WDID)
+
+# paste url base w/ WDID number
+node_url <- paste0(url, wdid$WDID[1])
+
+
+library(reactable)
+
+# all admins from node
+admins <- ditch_all %>%
+  filter(node_id == 3600729) %>%
+  mutate(
+    admin_number  = round(as.numeric(admin), 0 ),
+    admin         = as.numeric(admin)
+        ) %>%
+  # mutate(admin_number = round(as.numeric(admin), 0 )) %>%
+  dplyr::select(name, node_id, admin, admin_number) %>%
+  group_by(admin) %>%
+  slice(n = 1) %>%
+  ungroup() %>%
+  left_join(admin_dates, by = "admin_number") %>%
+  dplyr::select(name, node_id, admin, date) %>%
+  mutate(
+    cdss_url = paste0(url, node_id)
+  )
+
+
+
+node_tbl <- reactable::reactable(admins,
+                     columns = list(
+                          name       = colDef(name = "Structure Name", align = "center"),
+                          node_id    = colDef(name = "WDID", align = "center"),
+                          admin      = colDef(name = "Priority Admin No.", align = "center"),
+                          date       = colDef(name = "Appropriation Date", align = "center"),
+                          cdss_url   = colDef(name = "CDSS URL", align = "center")
+                        ), , highlight = TRUE)
+
+class(node_tbl)
+unique(admins$admin)
+# ---- NODE LEAFLET MAP ----
 node_marker <- node_pts %>%
   # filter(district == 6) %>%
   mutate(size = abs(avg_dem - mean(avg_dem))/ sd(avg_dem))
@@ -34,12 +103,18 @@ leaflet() %>%
 sum_avg_dem <- ditch_data %>%
        group_by(node_id, year) %>%
        summarize(avg_dem = sum(demand_all)) %>%
-       ungroup() %>%
-       group_by(node_id) %>%
-       summarize(avg_dem = mean(avg_dem))
+       ungroup()
 
-node_pts <- left_join(node_pts, sum_avg_dem, by = "node_id")
-saveRDS(node_pts, "node_pts2.rds")
+sum_avg_dem[is.na(sum_avg_dem)] <- 0
+
+sum_avg_dem2 <- sum_avg_dem %>%
+       group_by(node_id) %>%
+       summarize(avg_dem2 = mean(avg_dem))
+
+node_pts2 <- left_join(node_pts, sum_avg_dem2, by = "node_id")
+node_pts2 <- node_pts2 %>% dplyr::select(-avg_dem)
+node_pts2 <- node_pts2 %>% dplyr::rename(avg_dem = avg_dem2)
+saveRDS(node_pts2, "node_pts3.rds")
 # node points
 cdss <- sf::read_sf("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/water_rights/CDSS/CDSS_Structures/Structure.shp")
 
