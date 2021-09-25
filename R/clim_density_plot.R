@@ -1,3 +1,81 @@
+
+tmp_samples <- climate_samples %>%
+  filter(district == 6) %>%
+  dplyr::select(district, id, contains("pdsi"))
+
+# Future density plot
+density_future <- density(tmp_samples[[4]])
+future_yaxis <- density_future$y
+
+# Historic density plot
+density_hist <- density(tmp_samples[[3]])
+hist_yaxis <- density_hist$y
+
+indicator_label <- names(clim_model_indicator_lst[grep(pattern = paste0("pdsi"), clim_model_indicator_lst)])
+
+impact_label <- names(impacts_lst[grep(pattern = paste0("short_dir_norm"), impacts_lst)])
+
+highchart() %>%
+  # hc_plotOptions(
+  #   line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
+  #   scatter = list(marker = list(symbol = "circle"))
+  #   ) %>%
+  hc_yAxis(
+    min = 0,
+    max = 0.3,
+    tickInterval = 0.05,
+    title = list(
+      text = "", style = list(fontWeight = "bold",   fontSize = '1.2em')),
+    labels = list(
+      y = 20,
+      style = list(fontWeight = "bold",fontSize =  30, color = "black")),
+
+    min = 0, max = pmax(max(future_yaxis), max(hist_yaxis)),
+    opposite = F
+    ) %>%
+  hc_xAxis(
+    tickInterval = 1,
+    title = list(
+      text = indicator_label,
+      # text = "Average Temperature (C)",
+      style = list(fontWeight = "bold",fontSize = 30, color = "black")),
+    labels = list(
+      y = 45,
+      style = list(fontWeight = "bold",fontSize = 30, color = "black"))
+    ) %>%
+  hc_add_series(
+    data = density(tmp_samples[[3]]),
+    type = 'area',
+    name = paste0("Historic distribution"),
+    yAxis = 0, fillOpacity = 0.7) %>%
+  hc_add_series(
+    data = density(tmp_samples[[4]]),
+    type = 'area',
+    name = paste0("Projected distribution"),
+    yAxis = 0, fillOpacity = 0.7) %>%
+  # hc_colors(c("#C05555", "#55C0C0", "black")) %>% # "#5D6D7E"
+  # hc_colors(c("#55C0C0", "#C05555", "black")) %>% # "#5D6D7E"
+  # hc_colors(c("#6DC878", "#C86DBD", "black")) %>% # "#5D6D7E"
+  hc_colors(c("#679890", "#98676F", "black")) %>% # "#5D6D7E"
+  hc_legend(enabled = F) %>%
+  # hc_colors(c("#50A15D", "#71DC83", "black")) %>% # "#5D6D7E"
+  hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 density(by_district$prcp)
 density_vals <- density(mod_vals$Independent)
 density_yaxis <- density_vals$y

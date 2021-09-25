@@ -1055,8 +1055,21 @@ highcharter::highchartOutput("predictionPlot")
 # verbatimTextOutput("lmPlot")
 ```
 
+### Text
+```{r}
+verbatimTextOutput("reactText")
+```
+
 ```{r context = "server"}
-predictImpactsData <- eventReactive(input$submitButton2, {
+xxchange <- reactive({
+    paste(input$districtMapFuture_click ,  input$climChangeVarInput)
+})
+
+output$reactText <- renderText({
+  xxchange()
+})
+  
+predictImpactsData <- eventReactive(xxchange(), {
    # if(!is.null(input$districtMapFuture_click)) {
       click <- input$districtMapFuture_click %>%
             data.frame() %>%

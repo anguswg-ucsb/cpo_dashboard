@@ -11,7 +11,10 @@ tmp_ditch <- ditch_data %>%
   slice(n = 1) %>%
   ungroup() %>%
   arrange(node_id)
+tmp_ditch %>% filter(admin == "5295.00000")
+t <- ditch_data %>% filter(node_id == "0500601")
 
+length(unique(tmp_ditch$admin))
 ditch_names <- readRDS("ditch_names.rds")
 ditch_names <- ditch_names %>%
   group_by(admin) %>%
@@ -65,6 +68,12 @@ node_tbl <- reactable::reactable(admins,
                           cdss_url   = colDef(name = "CDSS URL", align = "center")
                         ), , highlight = TRUE)
 
+lm_predict <- predict(lm_vfit$model, clim_future_baked)
+
+predict_df <- data.frame(
+  year = as.numeric(1951:2099),
+  pred = 10^lm_predict
+)
 class(node_tbl)
 unique(admins$admin)
 # ---- NODE LEAFLET MAP ----
@@ -131,9 +140,13 @@ cdss <- cdss %>%
 ditch_shortages <- readRDS("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/impacts/statemod_output/shortages_by_right/final/shortages_by_right_all.rds")
 ditch_shortages <- readRDS("C:/Users/angus/OneDrive/Desktop/lynker/CPO/data/impacts/statemod_output/shortages_by_right/shortages_by_right_all2.rds") %>%
   filter(district != "38")
+
 # fix special admin numbers, remove characters
 ditch_shortages$node_id <- stringr::str_remove(ditch_shortages$node_id, "_D")
 ditch_shortages$node_id <- stringr::str_remove(ditch_shortages$node_id, "_I")
+
+t <- ditch_shortages %>% filter(admin == "5295.00000")
+
 
 # join node data w/ Lat, long coords
 ditch_pts <- left_join(ditch_shortages, dplyr::select(cdss, WDID, lat, lng

@@ -58,8 +58,8 @@ shp <- left_join(shp, tidy_mlr, by = c("DISTRICT" = "district"))
 
 
 maca <- readRDS("maca_data.rds")
-loca <- readRDS("loca_data.rds")
-bcca <- readRDS("bcca_data.rds")
+# loca <- readRDS("loca_data.rds")
+# bcca <- readRDS("bcca_data.rds")
 
 
 # node_pts <- readRDS("node_pts.rds")
@@ -76,9 +76,13 @@ impacts_lst <- list(
   "Natural flows"               = "af_total"
 )
 
+# basins <- readRDS("basin_outline.rds")
+# 
+# rivers <- readRDS("basin_rivers.rds")
+
 
 #Initialize Maps 
-output$districtMap     <- renderLeaflet({ mlr_map(shp = shp) })
+output$districtMap     <- renderLeaflet({ basemap(shp = shp) })
 output$nodeMap         <- renderLeaflet({ basemap(shp = shp) })
 ```
 
@@ -240,8 +244,19 @@ output$inputText <- renderPrint({
 
 Column {data-width=450}
 -----------------------------------------------------------------------
+### Water districts
+```{r}
+leafletOutput("districtMap")
+```
+
+### District
+```{r}
+valueBoxOutput("districtBoxNode")
+```
+
 ### Nodes
 ```{r}
+leafletOutput("nodeMap")
 # uiOutput("nodeMapUI") 
 # actionButton(
 #   "helpButton",
@@ -250,10 +265,6 @@ Column {data-width=450}
 #   # class = "btn-primary btn-lg",
 #   icon = icon("question-circle")
 #   )
-
-
-  
-leafletOutput("nodeMap")
 ```
 
 ```{r context="server"}
@@ -268,12 +279,12 @@ leafletOutput("nodeMap")
 #              title = "Current Details")
 #   })
 # render district value box at start
-# output$districtBoxNode <- renderValueBox(
-#                     valueBox(
-#                       value = "District", 
-#                       color = "success"
-#                   )
-#                 )
+output$districtBoxNode <- renderValueBox(
+                    valueBox(
+                      value = "District",
+                      color = "success"
+                  )
+                )
 
 # Clicking on map 1 outputs Value boxes on both pages + catchment polygons + Dat table + success panel
 observeEvent(input$districtMap_click, {
@@ -301,12 +312,12 @@ observeEvent(input$districtMap_click, {
                   mutate(district = as.numeric(district))
     
               # District number value box
-              # output$districtBoxNode <- renderValueBox(
-              #   valueBox(
-              #     value = paste0("District ", district_id$district),
-              #     color = "success"
-              #     )
-              #   )
+              output$districtBoxNode <- renderValueBox(
+                valueBox(
+                  value = paste0("District ", district_id$district),
+                  color = "success"
+                  )
+                )
               pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
               # bb = shp %>%
               #     st_bbox() %>%
@@ -319,7 +330,8 @@ observeEvent(input$districtMap_click, {
               #     st_buffer(0.009) %>%
               #     st_bbox() %>%
               #     as.vector()
-           
+            pal <- colorFactor(c("darkorange", "pink"), domain = shp$BASIN)
+            
               leafletProxy("districtMap") %>%
                   clearMarkers() %>%
                   clearShapes() %>%
@@ -328,7 +340,8 @@ observeEvent(input$districtMap_click, {
                         data = shp,
                         color = "black",
                         fillOpacity = 0.8,
-                        fillColor = ~pal(variance_rsq),
+                        fillColor = ~pal(BASIN),
+                        # fillColor = ~pal(variance_rsq),
                         weight = 2,
                         label = ~DISTRICT,
                         labelOptions = labelOptions(
@@ -338,8 +351,31 @@ observeEvent(input$districtMap_click, {
                           style = list(
                             "color" = "black",
                             "font-weight" = "1000")
+                          )
                       )
-                    ) 
+                  # addPolylines(
+                  #       data = basins[1,],
+                  #       # col = "red",
+                  #       col = "black",
+                  #       weight = 5,
+                  #       opacity = 1,
+                  #       label = ~basin_clean,
+                  # ) %>%
+                  # addPolylines(
+                  #       data = basins[2,],
+                  #       # col = "green",
+                  #       col = "black",
+                  #       weight = 5,
+                  #       opacity = 1,
+                  #       label = ~basin_clean,
+                  #   ) %>%
+                  # addPolylines(
+                  #       data = rivers,
+                  #       col = "blue",
+                  #       # col = "dodgerblue",
+                  #       weight = 3.5,
+                  #       opacity = 1
+                  #     )
               bb = shp %>%
                   # filter(DISTRICT == 6) %>% 
                   filter(DISTRICT == district_id$district) %>% 
@@ -356,15 +392,19 @@ observeEvent(input$districtMap_click, {
                   as.vector()
               
               node_marker <- node_pts %>%
-                # filter(district == 6)
-                filter(district == district_id$district) %>% 
+                # filter(district == 6) %>% 
+                filter(district == district_id$district) %>%
                 mutate(size = abs(avg_dem - mean(avg_dem))/ sd(avg_dem))
               
               leafletProxy("nodeMap") %>%
                     clearMarkers() %>%
                     clearShapes() %>%
+                leaflet() %>% 
                     addPolygons(
-                          data = filter(shp, DISTRICT == district_id$district),
+                          data = filter(shp, 
+                                        DISTRICT == district_id$district
+                                        # DISTRICT == 6
+                                        ),
                           fillColor = 'white',
                           fillOpacity = 0.4,
                           col = "black",
@@ -388,8 +428,32 @@ observeEvent(input$districtMap_click, {
                           fillOpacity = 0.7,
                           weight = 3,
                           layerId = ~node_id,
-                        
-                            stroke = TRUE) %>% 
+                          label = ~admin,
+                          stroke = TRUE
+                          ) %>% 
+                    # addPolylines(
+                    #       data = basins[1,],
+                    #       # col = "red",
+                    #       col = "black",
+                    #       weight = 5,
+                    #       opacity = 1,
+                    #       label = ~basin_clean
+                    #       ) %>%
+                    # addPolylines(
+                    #       data = basins[2,],
+                    #       # col = "green",
+                    #       col = "black",
+                    #       weight = 5,
+                    #       opacity = 1,
+                    #       label = ~basin_clean
+                    #       ) %>%
+                    # addPolylines(
+                    #       data = rivers,
+                    #       col = "blue",
+                    #       # col = "dodgerblue",
+                    #       weight = 3.5,
+                    #       opacity = 1 
+                    #       ) %>% 
                 flyToBounds(bounds[1], bounds[2], bounds[3], bounds[4])
           
               # output$nodeText <- renderText({
@@ -419,22 +483,13 @@ observeEvent(input$districtMap_click, {
       })
 ```
 
-### 
-```{r}
-
-```
-
 Column {data-width=450}
 -----------------------------------------------------------------------
-### Water districts
-```{r}
-leafletOutput("districtMap")
-```
-
 ### Admin shortages
 ```{r}
 highcharter::highchartOutput("adminShortagePlot")
 ```
+
 ```{r context="server"}
 observeEvent(input$nodeMap_marker_click, {
     node <<- input$nodeMap_marker_click$id

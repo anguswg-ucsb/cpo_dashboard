@@ -1,0 +1,23 @@
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<script>
+$( function() {
+  $( document ).tooltip(
+    {
+      position: {
+        using: function( position, feedback ) {
+          $( this ).css( position );
+          $( "<div>" )
+            .addClass( "arrow" )
+            .addClass( feedback.vertical )
+            .addClass( feedback.horizontal )
+            .appendTo( this );
+        }
+      },
+      show: {
+        effect: "slideDown",
+        delay: 500
+      }
+    }
+  );
+} );
+</script>

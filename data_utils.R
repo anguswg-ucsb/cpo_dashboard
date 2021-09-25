@@ -2,21 +2,29 @@
 basemap <- function(shp, pts = NULL) {
     # pal = colorNumeric("inferno", reverse= TRUE, domain = today$size, n = 50)
     # pal2 <- colorNumeric("inferno", reverse = TRUE, domain = today$cases, n = 50)
-
+  # pal_fact <- colorFactor(
+  #   c("darkorange", "lightgreen"),
+  #   # topo.colors(5),
+  #   domain = shp$BASIN
+  #         )
     leaflet() %>%
-          addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
+          addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic2") %>%
           # addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+          # addProviderTiles(providers$Esri.DeLorme, group = "ESRI DeLorme") %>%
           # addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
           # addLayersControl(
           #   options = layersControlOptions(collapsed = FALSE),
-          #   baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
+          #   baseGroups = c("Nat Geo Topographic","Nat Geo Topographic2", 'Topographic', "Imagery")
           # ) %>%
           addPolygons(
               data = shp,
               fillColor = 'white',
-              fillOpacity = 0.5,
+              # fillColor = 'grey',
+              # fillColor = ~pal_fact(BASIN),
+              fillOpacity = 0.6,
               col = "black",
-              weight = 3,
+              opacity = 1,
+              weight = 2.5,
               label = ~DISTRICT,
               labelOptions = labelOptions(
                   noHide = F,
@@ -27,31 +35,96 @@ basemap <- function(shp, pts = NULL) {
                     "font-weight" = "1000")
                   )
               ) %>%
+          # addPolylines(
+          #     data = basin[1,],
+          #     # col = "red",
+          #     col = "black",
+          #     weight = 5,
+          #     # opacity = 0.7,
+          #     label = ~basin_clean,
+          # ) %>%
+          # addPolylines(
+          #     data = basin[2,],
+          #     # col = "green",
+          #     col = "black",
+          #     weight = 5,
+          #     # opacity = 0.7,
+          #     label = ~basin_clean,
+          #   ) %>%
+          # addPolylines(
+          #     data = riv,
+          #     col = "blue",
+          #     # col = "dodgerblue",
+          #     weight = 2,
+          #     opacity = 1,
+          #     label = ~river
+          #   ) %>%
             addScaleBar("bottomleft") %>%
-            addMeasure(
-              position = "bottomleft",
-              primaryLengthUnit = "feet",
-              primaryAreaUnit = "sqmiles",
-              activeColor = "red",
-              completedColor = "green" ) %>%
+            # addMeasure(
+            #   position = "bottomleft",
+            #   primaryLengthUnit = "feet",
+            #   primaryAreaUnit = "sqmiles",
+            #   activeColor = "red",
+            #   completedColor = "green" ) %>%
             leafem::addMouseCoordinates()
 }
+basemap_node <- function(shp, pts = NULL) {
+  # pal = colorNumeric("inferno", reverse= TRUE, domain = today$size, n = 50)
+  # pal2 <- colorNumeric("inferno", reverse = TRUE, domain = today$cases, n = 50)
+  # pal_fact <- colorFactor(
+  #   c("darkorange", "lightgreen"),
+  #   # topo.colors(5),
+  #   domain = shp$BASIN
+  #         )
+  leaflet() %>%
+    # addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic2") %>%
+    # addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
+    addProviderTiles(providers$Esri.DeLorme, group = "ESRI DeLorme") %>%
+    # addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
+    # addLayersControl(
+    #   options = layersControlOptions(collapsed = FALSE),
+    #   baseGroups = c("Nat Geo Topographic","Nat Geo Topographic2", 'Topographic', "Imagery")
+    # ) %>%
+    addPolygons(
+      data = shp,
+      fillColor = 'white',
+      # fillColor = ~pal_fact(BASIN),
+      fillOpacity = 0.5,
+      col = "black",
+      weight = 2,
+      label = ~DISTRICT,
+      labelOptions = labelOptions(
+        noHide = F,
+        # direction = 'center',
+        # textOnly = F)
+        style = list(
+          "color" = "black",
+          "font-weight" = "1000")
+      )
+    ) %>%
+    addScaleBar("bottomleft") %>%
+    addMeasure(
+      position = "bottomleft",
+      primaryLengthUnit = "feet",
+      primaryAreaUnit = "sqmiles",
+      activeColor = "red",
+      completedColor = "green" ) %>%
+    leafem::addMouseCoordinates()
+}
+
 mlr_map <- function(shp, pts = NULL) {
 
       pal <- colorNumeric("YlOrRd", domain = shp$variance_rsq, n = 21)
       # Leaflet map
       leaflet() %>%
+        # addProviderTiles(providers$Esri.DeLorme, group = "ESRI DeLorme") %>%
         addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic") %>%
-        # addProviderTiles(providers$Esri.WorldTopoMap, group = "Topographic") %>%
-        # addProviderTiles(providers$Esri.WorldImagery, group = "Imagery") %>%
-        # addLayersControl(
-        #   options = layersControlOptions(collapsed = FALSE),
-        #   baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery")
-        # ) %>%
+        # addLayersControl(options = layersControlOptions(collapsed = FALSE),baseGroups = c("Nat Geo Topographic", 'Topographic', "Imagery") # ) %>%
         addPolygons(
           data = shp,
           color = "black",
-          fillOpacity = 0.8,
+          opacity = 1,
+          fillOpacity = 0.6,
           fillColor = ~pal(variance_rsq),
           weight = 2,
           label = ~DISTRICT,
@@ -74,14 +147,9 @@ mlr_map <- function(shp, pts = NULL) {
           opacity = 1
         ) %>%
         addScaleBar("bottomleft") %>%
-        addMeasure(
-          position = "bottomleft",
-          primaryLengthUnit = "feet",
-          primaryAreaUnit = "sqmiles",
-          activeColor = "red",
-          completedColor = "green" ) %>%
+        # addMeasure(  position = "bottomleft",   primaryLengthUnit = "feet",  primaryAreaUnit = "sqmiles", activeColor = "red",  completedColor = "green" ) %>%
         leafem::addMouseCoordinates() %>%
-        leaflet::setView(lng = -105.5, lat = 39.5, zoom = 6)
+        leaflet::setView(lng = -105.6, lat = 39.7, zoom = 6)
 }
 coeff_map <- function(shp, pts) {
     pal <- colorNumeric("viridis", domain = pts$af_total, n = 10)
