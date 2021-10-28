@@ -59,25 +59,25 @@ stk_hc <-
     ) %>%
   hc_legend(itemStyle = list(fontSize = 20, color = "black")) %>%
   hc_add_series(
-        data = ws_wide, name = "Direct Flow Shortage",
+        data = district_ts, name = "Direct Flow Shortage",
         type = 'column', hcaes(x = year, y = `Direct Flow Shortage`),
         tooltip = list(pointFormat = "Direct Flow Shortage: {point.Direct Flow Shortage} AF"),
         # yAxis = 1,
         fillOpacity = 0.1) %>%
   hc_add_series(
-    data = ws_wide, name = "Direct Flow Supply",
+    data = district_ts, name = "Direct Flow Supply",
     type = 'column',  hcaes(x = year, y = `Supply Direct flow`),
     tooltip = list(pointFormat = "Direct Flow Supply: {point.Supply Direct flow} AF"),
     # yAxis = 1,
     fillOpacity = 0.1) %>%
   hc_add_series(
-    data = ws_wide, name = "Demand",
+    data = district_ts, name = "Demand",
     type = 'line', hcaes(x = year, y = Demand),
     tooltip = list(pointFormat = "Demand: {point.Demand} AF")
     # yAxis = 1
   )  %>%
   hc_xAxis(
-    categories = ws_wide$year,
+    categories = district_ts$year,
     tickInterval = 2,
            labels = list(
     align = "center",
@@ -89,59 +89,114 @@ stk_hc <-
   hc_legend(enabled = F) %>%
   hc_chart(plotBorderWidth = 1, plotBorderColor = '#b4b4b4', height = NULL)
 stk_hc
-
+# ------ 2 --------
 highchart() %>%
-  hc_plotOptions(column = list(stacking = 'normal'),
-                 line = list(marker = list(enabled = FALSE), lineWidth = 6)) %>%
+  hc_plotOptions(column = list(stacking = 'normal'),line = list(marker = list(enabled = FALSE), lineWidth = 7)) %>%
   hc_yAxis(
-    # tickInterval = 10,
+    tickInterval = 10000,
     title = list(
-      text = "Water volume (acre feet)",
+      text = "Water volume (AF)",
       style = list(fontSize = 24, fontWeight = "bold", color = "black")),
     min = 0,
     labels = list(
-      # format = "{value} %",
       y = 10,
       style = list(fontSize = 22, color = "black", fontWeight = "bold"))
   ) %>%
   hc_xAxis(
-    categories = ws_wide$year,
+    categories = district_ts$year,
     tickInterval = 2,
     # title = list(
     #   # text = "Water volume (acre feet)",
     #   style = list(fontSize = 24, fontWeight = "bold", color = "black")),
     # min = 0,
     labels = list(
-      # format = "{value} %",
       y = 30,
       style = list(fontSize = 22, color = "black", fontWeight = "bold"))
   ) %>%
-
+  hc_legend(itemStyle = list(fontSize = 18, color = "black", fontWeight = "bold")) %>%
   hc_add_series(
-    data = ws_wide, name = "Total shortage",
+    data = district_ts, name = "Total shortage",
+    type = 'column', hcaes(x = year, y = short),
+    tooltip = list(pointFormat = "Total shortage: {point.short} AF"),
+    # yAxis = 1,
+    fillOpacity = 0.4) %>%
+  hc_add_series(
+    data = district_ts, name = "Augmented supply",
+    type = 'column', hcaes(x = year, y = `Supply Augmented`),
+    tooltip = list(pointFormat = "Augmented supply: {point.Supply Augmented} AF"),
+    # yAxis = 1,
+    fillOpacity = 0.4) %>%
+  hc_add_series(
+    data = district_ts, name = "Direct Flow Supply",
+    type = 'column',  hcaes(x = year, y = `Supply Direct flow`),
+    tooltip = list(pointFormat = "Direct Flow Supply: {point.Supply Direct flow} AF"),
+    # yAxis = 1,
+    fillOpacity = 0.4) %>%
+  hc_add_series(
+    data = district_ts, name = "Demand",
+    type = 'line', hcaes(x = year, y = Demand),
+    tooltip = list(pointFormat = "Demand: {point.Demand} AF")
+    # yAxis = 1
+  )  %>%
+  hc_colors(c("#E18686",  "#70BCE2", "#2984B2", "black")) %>%
+  hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)
+
+# ------ 3 --------
+highchart() %>%
+  hc_plotOptions(column = list(stacking = 'normal'),
+                 line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
+  hc_yAxis(
+    # tickInterval = 10,
+    title = list(
+      text = "Water volume (acre feet)",
+      style = list(fontSize = 24, fontWeight = "bold", color = "black")),
+    min = 0,
+
+    labels = list(
+      # format = "{value} %",
+      y = 10,
+      style = list(fontSize = 22, color = "black", fontWeight = "bold"))
+  ) %>%
+  # hc_yAxis(
+  #   title = list(text = "Water volume (acre feet)"), min = 0
+  #   ) %>%
+  # hc_title(text = "Timeseries of district-level demand, direct-flow supply, and shortages") %>%
+  # hc_yAxis_multiples(
+  #   list(title = list(text = "Shortage volume (M/Gal)"), min = 0, max = max(district_ts$short_dir), opposite = TRUE),
+  #   list(title = list(text = "Water volume (M/gal)"), min = 0, max = max(district_ts$Demand)) ) %>%
+  # hc_add_series( data = district_ts, name = "Demand", type = 'column', hcaes(x = year, y = Demand_diff), yAxis = 1,
+  # fillOpacity = 0.3) %>%
+  hc_add_series(
+    data = district_ts, name = "Total shortage",
     type = 'column', hcaes(x = year, y = short),
     tooltip = list(pointFormat = "Total shortage: {point.short} AF"),
     # yAxis = 1,
     fillOpacity = 0.3) %>%
+  # hc_add_series(
+  #     data = district_ts, name = "Direct shortage",
+  #     type = 'column', hcaes(x = year, y = short_dir),
+  #     # yAxis = 1,
+  #     fillOpacity = 0.3) %>%
   hc_add_series(
-    data = ws_wide, name = "Augmented supply",
+    data = district_ts, name = "Augmented supply",
     type = 'column', hcaes(x = year, y = `Supply Augmented`),
     tooltip = list(pointFormat = "Augmented supply: {point.Supply Augmented} AF"),
     # yAxis = 1,
     fillOpacity = 0.3) %>%
   hc_add_series(
-    data = ws_wide, name = "Direct Flow Supply",
+    data = district_ts, name = "Direct Flow Supply",
     type = 'column',  hcaes(x = year, y = `Supply Direct flow`),
     tooltip = list(pointFormat = "Direct Flow Supply: {point.Supply Direct flow} AF"),
     # yAxis = 1,
     fillOpacity = 0.3) %>%
-  # hc_add_series(data = ws_wide, name = "Total shortage",type = 'line', hcaes(x = year, y = short), yAxis = 0)  %>%
-  # hc_add_series(data = ws_wide, name = "Direct shortage",type = 'line', hcaes(x = year, y = short_dir), yAxis = 0)  %>%
+  # hc_add_series(data = district_ts, name = "Total shortage",type = 'line', hcaes(x = year, y = short), yAxis = 0)  %>%
+  # hc_add_series(data = district_ts, name = "Direct shortage",type = 'line', hcaes(x = year, y = short_dir), yAxis = 0)  %>%
   hc_add_series(
-    data = ws_wide, name = "Demand",
+    data = district_ts, name = "Demand",
     type = 'line', hcaes(x = year, y = Demand),
     tooltip = list(pointFormat = "Demand: {point.Demand} AF")
     # yAxis = 1
   )  %>%
+  hc_xAxis(categories = district_ts$year) %>%
   hc_colors(c("#E18686",  "#70BCE2", "#2984B2", "black")) %>%
   hc_chart(plotBorderWidth = 0.5, plotBorderColor = '#b4b4b4', height = NULL)

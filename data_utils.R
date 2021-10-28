@@ -284,7 +284,7 @@ click_to_AOI <- function(pt) {
 }
 
 # stepwise regression on model data, either on whole data set or by individual district, direction of stepwise direction can be selected, either "forward" (default) or "backward"
-rm_collinearity <- function(model, df, vif_thresh = 2.5) {
+rm_collinearity <- function(model, vif_thresh = 2.5) {
   # VIF threshold. variable w/ higher VIF than threshold are dropped from the model
   threshold <- vif_thresh
 

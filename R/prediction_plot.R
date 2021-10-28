@@ -28,7 +28,7 @@ mlr_district <- left_join(
   dplyr::select(short_year, year = wyear, district, 20:41),
   by = c("district", "year")
 ) %>%
-  filter(district == 2) %>%
+  filter(district == 6) %>%
   # filter(district == district_id$district) %>%
   dplyr::filter(!year %in% c(1980, 2013)) %>%
   # group_by(basin, district, water_right, year) %>%
@@ -78,7 +78,7 @@ mod_df <- mlr_district %>%
   )
 # ---- Prep data for model ----
 mod_df <- mod_df %>%
-  dplyr::select(short_dir, 11:20)
+  dplyr::select(short_dir_norm, 11:20)
   # dplyr::select(district, short_dir_norm, 11:18)
   # dplyr::select(futureDepVar(), 11:20)
 
@@ -94,7 +94,7 @@ mod_df[is.na(mod_df)] <- 0
 
 # multivariate stepwise regression
 lm_run <- lm(
-  short_dir~., data = mod_df) %>%
+  short_dir_norm~., data = mod_df) %>%
   # as.formula(
   #   paste0(futureDepVar()," ~ .")),
   # data = mod_df) %>%
@@ -132,7 +132,7 @@ pred_df <- pred_df %>%
 current_data <- present_indicators %>%
   ungroup() %>%
   # filter(district == district_id$district) %>%
-  filter(district == 2) %>%
+  filter(district == 6) %>%
   dplyr::select(-year, -district) %>%
   mutate(across(where(is.numeric), round, 3))
 
@@ -190,7 +190,7 @@ hist_predictors <- mlr_district %>%
 
 current_predictors <- present_indicators  %>%
   ungroup() %>%
-  filter(district == 2) %>%
+  filter(district == 6) %>%
   # filter(district == district_id$district) %>%
   dplyr::select(year, lm_run$predictors[1:2]) %>%
   mutate(across(where(is.numeric), round, 2)) %>%
@@ -198,7 +198,7 @@ current_predictors <- present_indicators  %>%
 
 future_predictors <- climate_models %>%
   ungroup() %>%
-  filter(district == 2, year > 2020) %>%
+  filter(district == 6, year > 2020) %>%
   # filter(district == district_id$district, year >2020) %>%
   dplyr::select(year, lm_run$predictors[1:2]) %>%
   # dplyr::select(-dataset, -district, -tmin, -tmax, -pet,-pet_harg, -pdsi_harg) %>%
@@ -214,7 +214,7 @@ highchart() %>%
                  line = list(marker = list(enabled = FALSE), lineWidth = 4)) %>%
   # hc_title(text = "Forecasted Water Shortages") %>%
   hc_yAxis(
-    max = 200000,
+    # max = 200000,
     tickInterval = 50000,
     title = list(text = "Direct Flow Shortage (acre feet)",
                  margin = 60,

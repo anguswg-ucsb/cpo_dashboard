@@ -28,7 +28,7 @@ mlr_district <- left_join(
   dplyr::select(short_year, year = wyear, district, 20:41),
   by = c("district", "year")
 ) %>%
-  filter(district == 2) %>%
+  filter(district == 6) %>%
   # filter(district == district_id$district) %>%
   dplyr::filter(!year %in% c(1980, 2013)) %>%
   # group_by(basin, district, water_right, year) %>%
@@ -70,16 +70,13 @@ mlr_district <- left_join(
   ) %>%
   ungroup()
 
-ggplot() +
-  geom_line(data = mlr_district, aes(x = year, y = short))
 
-short_var <- mlr_district %>%
-  dplyr::select(district, year, short, short_norm, short_dir, short_dir_norm)
 
 # ---- Prep data for model ----
 mod_df <- mlr_district %>%
   # dplyr::select(short, short_norm, short_dir, short_dir_norm, prcp,tavg, tmax, tmin, pdsi, spi1, spi3, spi6, spi9, spi12)
-  dplyr::select(short_dir_norm, swe_max, prcp, pdsi:tavg, pet, soilm)
+  dplyr::select(short_dir_norm, prcp, tavg, pdsi, spi1, spi3, spi6, spi9, spi12, eddi1, eddi3, eddi6, eddi12, swe_max, soilm)
+
 # ---- log transform data ----
 log_trans <- mod_df %>%
   mutate(
@@ -94,22 +91,34 @@ is.na(log_trans) <- sapply(log_trans, is.infinite)
 log_trans[is.na(log_trans)] <- 0
 
 log_trans <- log_trans %>%
-  dplyr::select(short_dir_norm, prcp, tavg, tmax, tmin, pdsi, spi1, spi3, spi6, spi9, spi12)
+  dplyr::select(short_dir_norm, prcp, tavg, pdsi, spi1, spi3, spi6, spi9, spi12, eddi1, eddi3, eddi6, eddi12, swe_max, soilm)
 
 # ---- MLR Model + stepwise regression ----
-lm_vfit <- lm(short_dir_norm~., data = log_trans) %>%
-  # rm_collinearity(vif_thresh = 3.5) %>%
+lm_vfit <- lm(short_dir_norm~., data = log_trans)%>%
   ols_step_forward_p()
+# calc VIF
+vf <- car::vif(lm_vfit$model)
+
+vf_df <- data.frame(vif = vf) %>%
+  rownames_to_column() %>%
+  filter(vif < 5)
+
+
+lm_step <- lm(
+  as.formula(paste("short_dir_norm", paste(vf_df$rowname, collapse=" + "), sep=" ~ ")),
+  data = log_trans)
+
 summary(lm_vfit)
 # predict shortages from MLR model
 mlr <- lm_vfit$model
+summary(mlr)
 lm_vfit$ca
 # data from selected variables
 climate_predictors <- mod_df %>%
   # dplyr::select(prcp, tavg, tmax, tmin, pdsi, spi1, spi3, spi6, spi9, spi12)
-  dplyr::select(lm_vfit$predictors)
+  dplyr::select(names(lm_step$model)[-1])
 
-pred <- predict(mlr, climate_predictors)
+pred <- predict(lm_step, climate_predictors)
 pred_df <- data.frame(
     year = 1981:2012,
     prediction = pred
@@ -131,9 +140,9 @@ highchart() %>%
   hc_yAxis(
     min = 0,
     max = 100,
-    tickInterval = 10,
+    tickInterval = 20,
     title = list(
-      text = "Normalized Direct Flow Shortage (% of demand)", margin = 60,
+      text = "Direct Flow Shortage (% of demand)", margin = 60,
       style = list(fontSize = 32, fontWeight = "bold", color = "black")),
     labels = list(format = "{value} %",
       y = 15,
@@ -146,15 +155,15 @@ highchart() %>%
     type = 'line', hcaes(x = year, y = historical),
     # yAxis = 1,
     fillOpacity = 0.5) %>%
-  # hc_add_series(
-  #   data = pred_df, name = "Modelled Shortages",
-  #   type = 'line', hcaes(x = year, y = prediction),
-  #   # yAxis = 1,
-  #   fillOpacity = 0.5) %>%
+  hc_add_series(
+    data = pred_df, name = "Modelled Shortages",
+    type = 'line', hcaes(x = year, y = prediction),
+    # yAxis = 1,
+    fillOpacity = 0.5) %>%
   hc_xAxis(
     categories      = pred_df$year,
     gridLineWidth  = 1,
-    tickInterval  = 2,
+    tickInterval  = 5,
     labels = list(
       align = "center",
       y = 35,
@@ -232,7 +241,7 @@ point_data2 <- left_join(
   dplyr::select(short_year, year = wyear, district, 20:41),
   by = c("district", "year")
 ) %>%
-  filter(district == 2) %>%
+  filter(district == 6) %>%
   # filter(district == 2) %>%
   # filter(district == district_id$district) %>%
   dplyr::filter(!year %in% c(1980, 2013)) %>%
@@ -287,40 +296,39 @@ log_trans <- point_data2 %>%
 is.na(log_trans) <- sapply(log_trans, is.infinite)
 log_trans[is.na(log_trans)] <- 0
 
-# SUBSET data for MLR
+# # SUBSET data for MLR
+# log_trans <- log_trans %>%
+#   dplyr::select(short_dir_norm, prcp, tavg, tmax, tmin, pdsi, spi1, spi3, spi6, spi9, spi12)
 log_trans <- log_trans %>%
-  dplyr::select(short_dir_norm, prcp, tavg, tmax, tmin, pdsi, spi1, spi3, spi6, spi9, spi12)
+  dplyr::select(short_dir_norm, prcp, tavg, pdsi, spi1, spi3, spi6, spi9, spi12, eddi1, eddi3, eddi6, eddi12, pet, swe_max, soilm)
 
 # dplyr::select(short_dir_norm, 10:11, 13:27)
 
 # MLR w/ VIF reduction + stepwise regression
-mlr_vfit <- lm(short_dir_norm~., data = log_trans) %>%
-  # rm_collinearity(df = mod_df, vif_thresh = 3.5) %>%
-  ols_step_forward_p()
+mlr_vfit <- lm(short_dir_norm~prcp, data = log_trans)
+  # rm_collinearity() %>%
+  # ols_step_forward_p()
 
 # fitted values
-fitted <- mlr_vfit$model$fitted.values
-rsq <- mlr_vfit$metrics %>%
-  mutate(r2 = round(r2, 2)) %>%
-  dplyr::select(r2)
-rsq
+fitted <- lm_step$fitted.values
+fitted <- mlr_vfit$fitted.values
 # Observed values
-observed <- mlr_vfit$model$model %>%
-  dplyr::select(short_dir_norm) # Observed values
+observed <- mlr_vfit$model
+  # dplyr::select(short_dir_norm) # Observed values
 
 observed$short_dir_norm
-
+summary(mlr_vfit$model)
 # rsquared <- mlr_vfit$metrics[1] %>%
 #   round(3) %>%
 #   as.character()
 #
 
 # observed vs. fitted dataframe
-mod_perform <- data.frame(fitted = fitted, observed = observed$short_dir_norm) %>%
+mod_perform <- data.frame(fitted = fitted, observed = observed$short_dir_norm, prcp = observed$prcp) %>%
   mutate(
     fitted    = 10^fitted,
-    observed  = 10^observed,
-    rsq = rsq
+    observed  = 10^observed
+    # rsq = rsq
     )
 
 
@@ -330,34 +338,30 @@ highchart() %>%
     scatter = list(marker = list(radius = 7))
     ) %>%
   hc_yAxis(
-    min = 0,
-    max = 100,
     tickInterval = 10,
     title = list(
-      text = "Normalized Direct Flow Shortage (% of demand)", margin = 60,
-      style = list(fontSize = 28, fontWeight = "bold", color = "black")),
+      text = "Observed", margin = 60,
+      style = list(fontSize = 32, fontWeight = "bold", color = "black")),
     labels = list(
-      format = "{value} %",
-      y = 15,
+      # format = "{value} %",
+      y = 35,
       x = -20,
       style = list(fontSize = 32, color = "black", fontWeight = "bold"))
     ) %>%
   hc_xAxis(
-    # min = 0,
-    # max = 65,
     gridLineWidth  = 1,
-    tickInterval  = 5,
+    tickInterval  = 10,
     title = list(
-      text = "Climate regression simulated",
+      text = "Predictions",
       margin = 30,
-      style = list(fontSize = 28, fontWeight = "bold", color = "black")),
+      style = list(fontSize = 32, fontWeight = "bold", color = "black")),
     labels = list(
       align = "center",
-      format = "{value} %",
-      y = 45,
+      # format = "{value} %",
+      y = 50,
       x = 35,
       padding = 1,
-      style = list(fontSize = 32, color = "black", fontWeight = "bold")
+      style = list(fontSize = 36, color = "black", fontWeight = "bold")
     )) %>%
   hc_legend(enabled = F) %>%
   # hc_colors(c("black", "red")) %>%
@@ -376,12 +380,35 @@ highchart() %>%
     type = 'point', hcaes(x = fitted, y =  observed), opacity = 0.9,
     yAxis = 0, fillOpacity = 0.1) %>%
   hc_add_series(
-    data = mod_perform, name = "One to one line",
+    data = arrange(mod_perform, prcp), name = "One to one line",
     type = 'line',
     hcaes(x = observed, y =  observed),
     opacity = 0.7,
     yAxis = 0, fillOpacity = 0.1)
+library(snotelr)
+library(shiny)
+library(bs4Dash)
 
+shiny::shinyApp(
+  ui = bs4DashPage(
+    enable_preloader = TRUE,
+    navbar = bs4DashNavbar(),
+    sidebar = bs4DashSidebar(),
+    controlbar = bs4DashControlbar(),
+    footer = bs4DashFooter(),
+    title = "test",
+    body = bs4DashBody(
+      bs4TooltipUI(
+        actionButton("goButton", "Hover to see the tooltip"),
+        title = "My tooltip",
+        placement = "top"
+      )
+    )
+  ),
+  server = function(input, output) {}
+)
+
+snotelr::snotel_explorer()
 library(raster)
 r <- raster(ncols=10, nrows=10)
 values(r) <- runif(ncell(r))

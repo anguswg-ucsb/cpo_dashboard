@@ -1,7 +1,17 @@
+# custom stuff
+myPaths <- .libPaths()   # get the paths
+myPaths <- c(myPaths[2], myPaths[1])  # switch them
+myPaths <- c(myPaths, 'C:/CustomR') # add new path
+.libPaths(myPaths)  # reassign them
+
+.libPaths()
+
+
+
 
 tmp_samples <- climate_samples %>%
   filter(district == 6) %>%
-  dplyr::select(district, id, contains("pdsi"))
+  dplyr::select(district, id, contains("tavg"))
 
 # Future density plot
 density_future <- density(tmp_samples[[4]])
@@ -21,9 +31,9 @@ highchart() %>%
   #   scatter = list(marker = list(symbol = "circle"))
   #   ) %>%
   hc_yAxis(
-    min = 0,
-    max = 0.3,
-    tickInterval = 0.05,
+    # min = 0,
+    # max = 0.3,
+    tickInterval = 0.1,
     title = list(
       text = "", style = list(fontWeight = "bold",   fontSize = '1.2em')),
     labels = list(
@@ -35,9 +45,11 @@ highchart() %>%
     ) %>%
   hc_xAxis(
     tickInterval = 1,
+    min = 5.5,
+    max = 13.5,
     title = list(
-      text = indicator_label,
-      # text = "Average Temperature (C)",
+      # text = indicator_label,
+      text = "Average Temperature (C)",
       style = list(fontWeight = "bold",fontSize = 30, color = "black")),
     labels = list(
       y = 45,

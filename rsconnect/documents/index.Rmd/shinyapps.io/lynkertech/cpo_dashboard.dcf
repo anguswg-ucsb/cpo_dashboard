@@ -1,0 +1,12 @@
+name: cpo_dashboard
+title: cpo_dashboard
+username:
+account: lynkertech
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4917820
+bundleId: 5159492
+url: https://lynkertech.shinyapps.io/cpo_dashboard/
+when: 1634752313.90785
+asMultiple: TRUE
+asStatic: FALSE
