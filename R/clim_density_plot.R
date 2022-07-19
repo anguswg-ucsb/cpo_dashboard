@@ -1,14 +1,146 @@
-# custom stuff
-myPaths <- .libPaths()   # get the paths
-myPaths <- c(myPaths[2], myPaths[1])  # switch them
-myPaths <- c(myPaths, 'C:/CustomR') # add new path
-.libPaths(myPaths)  # reassign them
+remove(list = ls())
+library(tidyverse)
+model_data      <- readRDS("statemod_climate_year2.rds")
 
-.libPaths()
+distr_lst       <- unique(model_data$district)
+
+samples_future     <- readRDS("climate_future_samples.rds") %>%
+  filter(district %in% distr_lst)
+
+samples_historic   <- readRDS("climate_historic_samples.rds") %>%
+  filter(district %in% distr_lst)
+
+output_future_lst   <- list()
+output_historic_lst <- list()
+
+for (i in 1:length(distr_lst)) {
+
+  future_df <- samples_future %>%
+    filter(district == distr_lst[i])
+
+  historic_df <- samples_historic %>%
+    filter(district == distr_lst[i])
+
+  distr <- future_df$district[1]
+
+  logger::log_info("Climate samples - District {distr}")
+
+  ind_vars <- future_df %>%
+    dplyr::select(-district, -type) %>%
+    names()
+
+  density_future_lst   <- list()
+  density_historic_lst <- list()
+
+  for (k in 1:length(ind_vars)) {
+    logger::log_info("{ind_vars[k]} density - District {distr}")
+
+    # density of future climate data
+    sample_density_future  <- future_df %>%
+      dplyr::select(-district, -type) %>%
+      pivot_longer(cols = everything()) %>%
+      filter(name == ind_vars[k])
+
+    # X & Y density values
+    future_x <- density(sample_density_future$value)$x
+    future_y <- density(sample_density_future$value)$y
+
+    # X Y in tidy dataframe
+    density_future <- data.frame(
+      # district = distr,
+      ind_var  = ind_vars[k],
+      x        = future_x,
+      y        = future_y
+    ) %>%
+      setNames(c('ind_var', paste0(ind_vars[k], "_x"),  paste0(ind_vars[k], "_y"))) %>%
+      as_tibble() %>%
+      dplyr::select(-ind_var) %>%
+      mutate(across(where(is.numeric), round, 5))
 
 
+    # density of historic climate data
+    sample_density_historic  <- historic_df %>%
+      dplyr::select(-district, -type) %>%
+      pivot_longer(cols = everything()) %>%
+      filter(name == ind_vars[k])
+
+    # X & Y density values
+    historic_x <- density(sample_density_historic$value)$x
+    historic_y <- density(sample_density_historic$value)$y
+
+    # X Y in tidy dataframe
+    density_historic <- data.frame(
+      # district = distr,
+      ind_var  = ind_vars[k],
+      x        = historic_x,
+      y        = historic_y
+    ) %>%
+      setNames(c('ind_var', paste0(ind_vars[k], "_x"),  paste0(ind_vars[k], "_y"))) %>%
+      as_tibble() %>%
+      dplyr::select(-ind_var) %>%
+      mutate(across(where(is.numeric), round, 5))
+
+    density_future_lst[[k]]   <- density_future
+    density_historic_lst[[k]] <- density_historic
+  }
+
+  density_future_clean <-  density_future_lst %>%
+    bind_cols() %>%
+    mutate(district = distr) %>%
+    dplyr::relocate(district)
+
+  density_historic_clean <-  density_historic_lst %>%
+    bind_cols() %>%
+    mutate(district = distr) %>%
+    dplyr::relocate(district)
+
+  output_future_lst[[i]]   <- density_future_clean
+  output_historic_lst[[i]] <- density_historic_clean
 
 
+  rm(historic_y, historic_x, density_historic, density_future, sample_density_future,sample_density_historic)
+}
+
+density_future   <- bind_rows(output_future_lst)
+
+density_historic <- bind_rows(output_historic_lst)
+
+# density <- bind_rows(density_future, density_historic)
+
+# save density values
+# saveRDS(density_future, "climate_future_density.rds")
+# saveRDS(density_historic, "climate_historic_density.rds")
+# saveRDS(density, "climate_density.rds")
+tmp <- density_future %>%
+  filter(district == 1) %>%
+  mutate(
+
+  )
+
+
+tmp %>%
+    pivot_wider(
+      id_cols     = c(district, ind_var),
+      names_from  = "ind_var",
+      names_glue  = "{ind_var}_{.value}",
+      values_from = c(x, y)
+      # values_fill = NA,
+      # values_from = c(dvolume, inflow, outflow)
+    )
+
+plot(tmp$y~tmp$x)
+sample_density <- density(tmp$prcp)
+sample_density2 <- density(tmp$tmax)
+xx <- sample_density$x
+yy <- sample_density$y
+df <- data.frame(xx, yy)
+plot(sample_density)
+plot(df$yy~df$xx)
+sample_lst <- c(sample_density, sample_density2) %>% bind_rows()
+
+matrix(sample_density)
+sample_density$y
+class(sample_density)
 tmp_samples <- climate_samples %>%
   filter(district == 6) %>%
   dplyr::select(district, id, contains("tavg"))
@@ -30,34 +162,38 @@ highchart() %>%
   #   line = list(marker = list(enabled = FALSE, symbol = "circle"), lineWidth = 5),
   #   scatter = list(marker = list(symbol = "circle"))
   #   ) %>%
-  hc_yAxis(
-    # min = 0,
-    # max = 0.3,
-    tickInterval = 0.1,
-    title = list(
-      text = "", style = list(fontWeight = "bold",   fontSize = '1.2em')),
-    labels = list(
-      y = 20,
-      style = list(fontWeight = "bold",fontSize =  30, color = "black")),
-
-    min = 0, max = pmax(max(future_yaxis), max(hist_yaxis)),
-    opposite = F
-    ) %>%
-  hc_xAxis(
-    tickInterval = 1,
-    min = 5.5,
-    max = 13.5,
-    title = list(
-      # text = indicator_label,
-      text = "Average Temperature (C)",
-      style = list(fontWeight = "bold",fontSize = 30, color = "black")),
-    labels = list(
-      y = 45,
-      style = list(fontWeight = "bold",fontSize = 30, color = "black"))
-    ) %>%
+  # hc_yAxis(
+  #   # min = 0,
+  #   # max = 0.3,
+  #   tickInterval = 0.1,
+  #   title = list(
+  #     text = "", style = list(fontWeight = "bold",   fontSize = '1.2em')),
+  #   labels = list(
+  #     y = 20,
+  #     style = list(fontWeight = "bold",fontSize =  30, color = "black")),
+  #
+  #   min = 0, max = pmax(max(future_yaxis), max(hist_yaxis)),
+  #   opposite = F
+  #   ) %>%
+  # hc_xAxis(
+  #   tickInterval = 1,
+  #   min = 5.5,
+  #   max = 13.5,
+  #   title = list(
+  #     # text = indicator_label,
+  #     text = "Average Temperature (C)",
+  #     style = list(fontWeight = "bold",fontSize = 30, color = "black")),
+  #   labels = list(
+  #     y = 45,
+  #     style = list(fontWeight = "bold",fontSize = 30, color = "black"))
+  #   ) %>%
   hc_add_series(
-    data = density(tmp_samples[[3]]),
+
+    # data = density(tmp_samples[[3]]),
+    # data = df,
+    data = sample_density,
     type = 'area',
+    # hcaes(x = xx, y = yy),
     name = paste0("Historic distribution"),
     yAxis = 0, fillOpacity = 0.7) %>%
   hc_add_series(

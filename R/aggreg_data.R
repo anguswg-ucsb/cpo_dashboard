@@ -1,4 +1,30 @@
 
+tmp <- trans_log %>%
+  arrange(-demand2)
+tmp2 <- district_data
+plot(tmp$demand)
+ggplot() +
+  geom_col(data = tmp, aes(x = year, y = demand2))
+  # scale_x_continuous(trans = 'log2')  +
+  # scale_y_continuous(trans = 'sqrt')
+p <- ggplot(cars, aes(x = speed, y = dist)) +
+  geom_point() +
+  scale_x_continuous(trans = 'log2')  +
+  # scale_y_continuous(trans = 'log2')
+p
+plotly::ggplotly(p)
+c <- cars
+
+log(cars$speed)
+# Possible values for trans : 'log2', 'log10','sqrt'
+p + scale_x_continuous(trans = 'log2') +
+  scale_y_continuous(trans = 'log2')
+
+# Format y axis tick mark labels to show exponents
+require(scales)
+p + scale_y_continuous(trans = log2_trans(),
+                       breaks = trans_breaks("log2", function(x) 2^x),
+                       labels = trans_format("log2", math_format(2^.x)))
 # ---------------------------------------------------
 # ------ by admin shortage join w/ climate var ------
 # ---------------------------------------------------
