@@ -1,12 +1,6 @@
 # --- Shiny utils ---
 basemap <- function(shp, pts = NULL) {
-    # pal = colorNumeric("inferno", reverse= TRUE, domain = today$size, n = 50)
-    # pal2 <- colorNumeric("inferno", reverse = TRUE, domain = today$cases, n = 50)
-  # pal_fact <- colorFactor(
-  #   c("darkorange", "lightgreen"),
-  #   # topo.colors(5),
-  #   domain = shp$BASIN
-  #         )
+
     leaflet() %>%
           addProviderTiles(providers$Esri.NatGeoWorldMap, group = "Nat Geo Topographic2") %>%
           addPolygons(
@@ -34,27 +28,12 @@ basemap <- function(shp, pts = NULL) {
           leaflet::setView(lng = -105.6, lat = 39.7, zoom = 6)
 
 }
-# x = 1
-# y = 2
-# z = 4
-# if(is.null(x) | is.null(y) | is.null(z)) {
-#
-#   print("NULL values")
-# } else {
-#   print("Not NULL values")
-# }
+
 # Leaflet map with MLR metrics as district colors
 mlr_map <- function(shp, pts = NULL) {
 
   # Variance * R2 colors (normalized)
   pal <- colorNumeric(viridisLite::magma(n = 30, direction = -1), domain = shp$var_sensitivity_norm, reverse = F, n = 30)
-  # pal <- colorNumeric("Spectral", domain = shp$var_sensitivity_norm, reverse = T, n = 30)
-  # pal <- colorNumeric("RdYlBu", domain = shp$var_sensitivity_norm, reverse = T, n = 30)
-
-  # Standard dev. * R2 colors (normalized)
-  # pal <- colorNumeric(viridisLite::magma(n = 30, direction = -1), domain = shp$sd_sensitivity_norm, reverse = F, n = 30)
-  # pal <- colorNumeric("Spectral", domain = shp$sd_sensitivity_norm, reverse = T, n = 30)
-  # pal <- colorNumeric("RdYlBu", domain = shp$sd_sensitivity_norm, reverse = T, n = 30)
 
 
       # Leaflet map
@@ -177,15 +156,11 @@ custom_theme <- hc_theme_merge(
     ),
     legend = list(
       itemStyle = list(
-        # fontFamily = "Montserrat"
         fontFamily = "Helvetica"
-        # fontFamily = "Arial"
       )),
     title = list(
       style = list(
-        # fontFamily = "Montserrat"
         fontFamily = "Helvetica"
-        # fontFamily = "Arial"
       )
     )
   )
@@ -1312,109 +1287,6 @@ ws_plot <- function(data, type = c("area", "bar"), xbreaks = 16) {
   }
 }
 
-
-# Takes map click --> creates extent polygon --> gets climate raster for prediction --> outputs point raster
-# click_to_AOI <- function(pt) {
-#   buffer <- pt %>%
-#     st_transform(5070) %>%
-#     st_buffer(4000) %>%
-#     st_transform(4326)
-#
-#   bb = buffer %>%
-#     st_bbox() %>%
-#     st_as_sfc() %>%
-#     st_transform(4326) %>%
-#     st_as_sf()
-# }
-
-# stepwise regression on model data, either on whole data set or by individual district, direction of stepwise direction can be selected, either "forward" (default) or "backward"
-# rm_collinearity <- function(model, vif_thresh = 2.5) {
-#   # VIF threshold. variable w/ higher VIF than threshold are dropped from the model
-#   threshold <- vif_thresh
-# # model <- mlr_vfit$model
-#   # Sequentially drop the variable with the largest VIF until all variables have VIF less than threshold
-#   drop = TRUE
-#
-#   after_vif=data.frame()
-#   while(drop==TRUE) {
-#     vfit=car::vif(model)
-#     after_vif=plyr::rbind.fill(after_vif,as.data.frame(t(vfit)))
-#     if(max(vfit) > threshold) {
-#       model <- update(
-#         model, as.formula(paste(".","~",".","-",names(which.max(vfit))))
-#       )
-#     }
-#     else { drop=FALSE }
-#   }
-#   model
-# }
-
-
-# vif_func<-function(in_frame,thresh=10,trace=T,...){
-#
-#   library(fmsb)
-#
-#   if(any(!'data.frame' %in% class(in_frame))) in_frame<-data.frame(in_frame)
-#
-#   #get initial vif value for all comparisons of variables
-#   vif_init<-NULL
-#   var_names <- names(in_frame)
-#   for(val in var_names){
-#     regressors <- var_names[-which(var_names == val)]
-#     form <- paste(regressors, collapse = '+')
-#     form_in <- formula(paste(val, '~', form))
-#     vif_init<-rbind(vif_init, c(val, VIF(lm(form_in, data = in_frame, ...))))
-#   }
-#   vif_max<-max(as.numeric(vif_init[,2]), na.rm = TRUE)
-#
-#   if(vif_max < thresh){
-#     if(trace==T){ #print output of each iteration
-#       prmatrix(vif_init,collab=c('var','vif'),rowlab=rep('',nrow(vif_init)),quote=F)
-#       cat('\n')
-#       cat(paste('All variables have VIF < ', thresh,', max VIF ',round(vif_max,2), sep=''),'\n\n')
-#     }
-#     return(var_names)
-#   }
-#   else{
-#
-#     in_dat<-in_frame
-#
-#     #backwards selection of explanatory variables, stops when all VIF values are below 'thresh'
-#     while(vif_max >= thresh){
-#
-#       vif_vals<-NULL
-#       var_names <- names(in_dat)
-#
-#       for(val in var_names){
-#         regressors <- var_names[-which(var_names == val)]
-#         form <- paste(regressors, collapse = '+')
-#         form_in <- formula(paste(val, '~', form))
-#         vif_add<-VIF(lm(form_in, data = in_dat, ...))
-#         vif_vals<-rbind(vif_vals,c(val,vif_add))
-#       }
-#       max_row<-which(vif_vals[,2] == max(as.numeric(vif_vals[,2]), na.rm = TRUE))[1]
-#
-#       vif_max<-as.numeric(vif_vals[max_row,2])
-#
-#       if(vif_max<thresh) break
-#
-#       if(trace==T){ #print output of each iteration
-#         prmatrix(vif_vals,collab=c('var','vif'),rowlab=rep('',nrow(vif_vals)),quote=F)
-#         cat('\n')
-#         cat('removed: ',vif_vals[max_row,1],vif_max,'\n\n')
-#         flush.console()
-#       }
-#
-#       in_dat<-in_dat[,!names(in_dat) %in% vif_vals[max_row,1]]
-#
-#     }
-#
-#     return(names(in_dat))
-#
-#   }
-#
-# }
-
 normalize <- function(x) {
   return ((x - min(x)) / (max(x) - min(x)))
 }
@@ -1433,22 +1305,3 @@ norm_minmax <- function(x){
 mean_norm_minmax <- function(x){
   (x- mean(x)) /(max(x)-min(x))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

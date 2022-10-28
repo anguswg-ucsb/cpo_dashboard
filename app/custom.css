@@ -1,0 +1,44 @@
+
+.section level3 chart-wrapper chart-wrapper-flex {
+    flex: 100 0px;
+}
+
+.bg-success {
+    background-color: rgba(0,51,102, 0.8);
+}
+.bg-primary {
+    color: white;
+    background-color: rgba(0,51,102, 0.8);
+}
+.value-box .caption {
+    font-size: 20px;
+    color: white;
+}
+.value-box .value {
+    font-size: 38px;
+    color: white;
+    font-weight: bold;
+    margin: 0 0 3px 0;
+    white-space: nowrap;
+    padding: 0;
+}
+
+h4, .h4 {
+    font-size: 18px;
+    color: black;
+}
+h5, .h5 {
+    font-size: 14px;
+    color: dimgrey;
+}
+
+.btn-default:hover {
+    color: white;
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight: 500;
+    line-height: 1.2;
+    color: #000000;
+}
